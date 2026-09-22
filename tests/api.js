@@ -70,6 +70,13 @@ const iso = (offsetDays) => Booking.toISODate(Booking.addDays(new Date(), offset
 
   /* ============================ GENEL UÇLAR =========================== */
 
+  section('Ayarlar (.env)');
+  const serverConfig = require('../server/config.js');
+  /* Testler kendi şifresini ortam değişkeniyle verir; .env dosyası bunu ezmemeli */
+  eq('açıkça verilen ayar .env tarafından ezilmez', serverConfig.adminPassword, PASSWORD);
+  eq('test veritabanı kullanılıyor', serverConfig.databaseFile, TEST_DB);
+  eq('varsayılan şifre kullanılmıyor', serverConfig.usingDefaultPassword, false);
+
   section('Genel uçlar');
   let r = await api('GET', '/api/health');
   eq('health 200', r.status, 200);

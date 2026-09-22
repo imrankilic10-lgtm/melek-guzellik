@@ -21,14 +21,18 @@
     },
 
     /* ---------------------------------------------------------------
-     * YÖNETİCİ PANELİ ŞİFRESİ
+     * YEREL MOD ŞİFRESİ  (yalnızca sunucu çalışmıyorken geçerlidir)
      *
-     * !! MUTLAKA DEĞİŞTİRİN !!
-     * Bu şifre yalnızca paneli meraklı gözlerden uzak tutar.
-     * Tarayıcıda çalıştığı için gerçek bir güvenlik önlemi DEĞİLDİR.
-     * Ayrıntı için README.md > "Güvenlik" bölümüne bakın.
+     * GERÇEK ŞİFRENİZ BURADA DEĞİL, .env DOSYASINDADIR.
+     *
+     * Bu dosya tarayıcıya olduğu gibi indirilir ve depoya girer; yani
+     * buraya yazılan her şeyi siteyi açan herkes okuyabilir. Bu yüzden
+     * gerçek şifre buraya KONULMAZ.
+     *
+     * Sunucu çalışırken (npm start) bu değer hiç kullanılmaz; panel
+     * .env içindeki MELEK_ADMIN_PASSWORD ile açılır.
      * ------------------------------------------------------------- */
-    adminPasscode: 'melek2026',
+    adminPasscode: 'yerel-mod',
 
     /* ---------------------------------------------------------------
      * ÇALIŞMA DÜZENİ

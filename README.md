@@ -32,8 +32,13 @@ Salon tek personelle çalıştığı için sistem **aynı anda tek randevuya** i
 Node.js 22.5 veya üstü gerekir (`node --version` ile kontrol edin).
 
 ```bash
-# Yönetici şifrenizi belirleyip sunucuyu başlatın
-MELEK_ADMIN_PASSWORD='kendi-sifreniz' npm start
+npm start
+```
+
+Şifre `.env` dosyasından okunur. Dosya yoksa örnekten kopyalayın:
+
+```bash
+cp .env.example .env      # sonra içindeki şifreyi düzenleyin
 ```
 
 | Sayfa | Adres |
@@ -68,9 +73,10 @@ vardır; gerçek kullanım için **API modu** tercih edilmelidir.
 
 ## İlk Kurulumda Yapılacaklar
 
-1. **Yönetici şifresini belirleyin.** `MELEK_ADMIN_PASSWORD` ortam
-   değişkenini ayarlayın. Ayarlanmazsa sunucu varsayılan şifreyle çalışır
-   ve açılışta uyarı verir.
+1. **Yönetici şifresini belirleyin.** `.env` dosyasındaki
+   `MELEK_ADMIN_PASSWORD` satırını düzenleyin. Dosya yoksa
+   `cp .env.example .env` ile oluşturun. Şifre ayarlanmazsa sunucu
+   varsayılan şifreyle çalışır ve açılışta uyarı verir.
 2. **Kapalı günlerinizi girin.** Haftalık izin gününüz varsa `js/config.js`
    içindeki `closedWeekdays` ayarını doldurun (örn. pazar için `[0]`).
 3. **Çalışma saatlerinizi kontrol edin.** `js/config.js` → `timeSlots`.
@@ -181,9 +187,13 @@ mantığı ve doğrulama kuralları böylece tek bir yerde tanımlıdır.
 | `closedWeekdays` | Haftalık kapalı günler — `0` pazar, `6` cumartesi |
 | `closedDates` | Tatil/izin tarihleri, örn. `['2026-10-29']` |
 | `minimumNoticeMinutes` | Randevunun en az kaç dakika öncesinden alınabileceği |
-| `adminPasscode` | **Yalnızca yerel modda** geçerli panel şifresi |
+| `adminPasscode` | **Yalnızca yerel modda** geçerli geçici şifre — gerçek şifre `.env` dosyasındadır |
 
-### Sunucu ayarları — ortam değişkenleri
+### Sunucu ayarları — `.env` dosyası
+
+Sunucu açılışta proje kökündeki `.env` dosyasını okur. Bu dosya
+`.gitignore` içindedir; depoya girmez, tarayıcıya sunulmaz. Komut
+satırında verilen ortam değişkenleri `.env` değerlerini ezer.
 
 | Değişken | Varsayılan | Açıklama |
 | --- | --- | --- |
@@ -276,16 +286,24 @@ Sistemde uygulananlar:
 
 Sizin yapmanız gerekenler:
 
-1. **Şifreyi değiştirin.** `MELEK_ADMIN_PASSWORD` ayarlanmazsa sunucu
-   açılışta uyarı basar.
+1. **Şifreyi `.env` dosyasına yazın.** Ayarlanmazsa sunucu açılışta uyarı
+   basar. Şifre büyük/küçük harf ve Türkçe karakter duyarlıdır.
 2. **HTTPS kullanın.** Panel üzerinden müşteri adı ve telefonu geçer.
    `deploy/nginx.conf` örneğine bakın, `MELEK_SECURE_COOKIES=1` yapın.
 3. **İsterseniz paneli ikinci bir katmanla koruyun.** nginx `auth_basic`
    örneği `deploy/nginx.conf` içinde yorum satırı olarak hazır.
 
-> **Yerel mod uyarısı:** Sunucusuz kullanımda panel şifresi `js/config.js`
-> içindedir ve dosyayı açan herkes görebilir. Bu yalnızca paneli kazara
-> açılmaktan korur. Gerçek koruma API modunda sağlanır.
+### Şifre nerede durmalı
+
+| Dosya | İçerik | Depoya girer mi? | Tarayıcıya iner mi? |
+| --- | --- | --- | --- |
+| `.env` | **Gerçek şifreniz** | ❌ Hayır | ❌ Hayır |
+| `js/config.js` | Yalnızca yerel mod için geçici şifre | ✅ Evet | ✅ Evet |
+
+> **Gerçek şifrenizi `js/config.js` içine yazmayın.** Bu dosya her ziyaretçinin
+> tarayıcısına indirilir ve depoya girer; depo herkese açıksa şifre kalıcı
+> olarak görünür olur. Oradaki değer yalnızca sunucu çalışmıyorken (yerel
+> mod) geçerlidir ve giriş ekranında bu durum belirtilir.
 
 ---
 
@@ -294,9 +312,9 @@ Sizin yapmanız gerekenler:
 ### Kendi sunucunuzda (VPS)
 
 ```bash
-# 1. Dosyaları sunucuya kopyalayın
+# 1. Dosyaları sunucuya kopyalayın (.env dahil edilmez, ayrıca kurulur)
 sudo mkdir -p /var/www/melek-guzellik
-sudo rsync -a ./ /var/www/melek-guzellik/
+sudo rsync -a --exclude='.env' --exclude='data' ./ /var/www/melek-guzellik/
 
 # 2. Şifreyi ayarlayın
 echo "MELEK_ADMIN_PASSWORD='guclu-bir-sifre'" | sudo tee /etc/melek.env
@@ -355,10 +373,10 @@ kayıtların tamamını değiştirir; onay sorulur.
 
 ## Test
 
-Dört test paketi vardır; toplam **383 kontrol**.
+Dört test paketi vardır; toplam **386 kontrol**.
 
 ```bash
-npm test            # iş mantığı (78) + API (96)  — tarayıcı gerekmez
+npm test            # iş mantığı (78) + API (99)  — tarayıcı gerekmez
 npm run test:e2e    # tarayıcı, yerel mod (170)   — Playwright gerekir
 npm run test:e2e-api # tarayıcı, API modu (39)
 npm run test:all    # hepsi
@@ -378,7 +396,7 @@ eşzamanlı istek yarışı, oturum ve yetki kontrolleri, giriş deneme sınır�
 dosya erişim koruması, yedekleme/geri yükleme, erişilebilirlik, console
 hatası kontrolü ve 375–1440px responsive kontrolü.
 
-**Son çalıştırma: 383 kontrol başarılı, 0 başarısız, console hatası yok.**
+**Son çalıştırma: 386 kontrol başarılı, 0 başarısız, console hatası yok.**
 
 ---
 

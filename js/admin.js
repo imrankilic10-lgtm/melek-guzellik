@@ -79,6 +79,17 @@
     document.body.classList.add('is-locked');
     el.gateError.hidden = true;
     el.gatePasscode.value = '';
+
+    /* Sunucu çalışmıyorsa hangi şifrenin geçerli olduğunu belirt */
+    if (el.gateMode) {
+      if (Store.isApi()) {
+        el.gateMode.hidden = true;
+      } else {
+        el.gateMode.textContent = 'Sunucu çalışmıyor — yerel mod. ' +
+          'Bu modda js/config.js içindeki geçici şifre geçerlidir.';
+        el.gateMode.hidden = false;
+      }
+    }
     el.gatePasscode.focus();
   }
 
@@ -601,6 +612,7 @@
     el.gateForm = $('gate-form');
     el.gatePasscode = $('gate-passcode');
     el.gateError = $('gate-error');
+    el.gateMode = $('gate-mode');
     el.panel = $('panel');
     el.todayLabel = $('today-label');
     el.filters = $('filters');

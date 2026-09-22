@@ -661,6 +661,16 @@ a { color: var(--coffee); }
   border-radius: var(--radius);
 }
 .gate__back { margin: 18px 0 0; text-align: center; font-size: 13px; }
+.gate__mode {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
 
 /* ------------------------------- Panel ----------------------------------- */
 

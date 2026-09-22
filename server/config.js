@@ -4,9 +4,46 @@
  */
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
+
+/*
+ * .env dosyasını okur (varsa). Böylece şifreyi her seferinde komut
+ * satırında yazmak gerekmez ve gizli değerler koda girmez.
+ * Zaten tanımlı ortam değişkenleri ezilmez.
+ */
+function loadEnvFile() {
+  const envPath = process.env.MELEK_ENV_FILE || path.join(ROOT, '.env');
+
+  let contents;
+  try {
+    contents = fs.readFileSync(envPath, 'utf8');
+  } catch (err) {
+    return;                                   /* .env yoksa sorun değil */
+  }
+
+  contents.split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+
+    const separator = trimmed.indexOf('=');
+    if (separator < 1) return;
+
+    const key = trimmed.slice(0, separator).trim();
+    let value = trimmed.slice(separator + 1).trim();
+
+    /* Tırnak içindeki değerlerde tırnakları kaldır */
+    const quoted = (value.startsWith('"') && value.endsWith('"')) ||
+                   (value.startsWith("'") && value.endsWith("'"));
+    if (quoted && value.length > 1) value = value.slice(1, -1);
+
+    if (process.env[key] === undefined) process.env[key] = value;
+  });
+}
+
+loadEnvFile();
 
 function intFromEnv(name, fallback) {
   const raw = process.env[name];
