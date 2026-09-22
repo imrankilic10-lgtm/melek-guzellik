@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Melek Güzellik Salonu — Online Randevu</title>
+  <meta name="description" content="Melek Güzellik Salonu online randevu sistemi. Lazer epilasyon, cilt bakımı, manikür, pedikür, kaş ve kirpik hizmetleri.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">İçeriğe geç</a>
+
+  <header class="site-header">
+    <div class="wrap site-header__inner">
+      <div class="brand">
+        <span class="brand__name">Melek</span>
+        <span class="brand__sub">Güzellik Salonu</span>
+      </div>
+      <a class="phone" href="tel:+905551918058" aria-label="Telefonla ara: 0555 191 8058">
+        <svg class="phone__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.4 11.4 0 0 0 .58 3.6 1 1 0 0 1-.25 1z"/>
+        </svg>
+        <span>0555 191 8058</span>
+      </a>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+    <section class="intro">
+      <h1 class="intro__title">Online Randevu</h1>
+      <p class="intro__text">Hizmetinizi seçin, size uygun gün ve saati belirleyin. Randevunuz anında oluşturulur.</p>
+    </section>
+
+    <!-- Adım göstergesi -->
+    <ol class="stepper" id="stepper" aria-label="Randevu adımları">
+      <li class="stepper__item is-active" data-step="1"><span class="stepper__num">1</span><span class="stepper__label">Hizmet</span></li>
+      <li class="stepper__item" data-step="2"><span class="stepper__num">2</span><span class="stepper__label">Tarih &amp; Saat</span></li>
+      <li class="stepper__item" data-step="3"><span class="stepper__num">3</span><span class="stepper__label">Bilgiler</span></li>
+      <li class="stepper__item" data-step="4"><span class="stepper__num">4</span><span class="stepper__label">Onay</span></li>
+    </ol>
+
+    <!-- Bildirim alanı -->
+    <p class="notice" id="notice" role="alert" hidden></p>
+
+    <!-- ADIM 1 — HİZMET SEÇİMİ -->
+    <section class="step" id="step-1" aria-labelledby="step-1-title">
+      <h2 class="step__title" id="step-1-title">Hizmet Seçimi</h2>
+      <div id="categories"></div>
+    </section>
+
+    <!-- ADIM 2 — TARİH VE SAAT -->
+    <section class="step" id="step-2" aria-labelledby="step-2-title" hidden>
+      <h2 class="step__title" id="step-2-title">Tarih ve Saat</h2>
+
+      <h3 class="block__title" id="date-title">Tarih seçin</h3>
+      <div class="days" id="days" role="group" aria-labelledby="date-title"></div>
+
+      <h3 class="block__title" id="time-title">Saat seçin</h3>
+      <p class="hint" id="time-hint">Saatleri görmek için önce bir tarih seçin.</p>
+      <div class="slots" id="slots" role="group" aria-labelledby="time-title"></div>
+    </section>
+
+    <!-- ADIM 3 — MÜŞTERİ BİLGİLERİ -->
+    <section class="step" id="step-3" aria-labelledby="step-3-title" hidden>
+      <h2 class="step__title" id="step-3-title">Bilgileriniz</h2>
+
+      <form class="form" id="customer-form" novalidate>
+        <div class="field">
+          <label for="customer-name">Ad Soyad</label>
+          <input type="text" id="customer-name" name="name" autocomplete="name"
+                 placeholder="Ad Soyad" required>
+        </div>
+        <div class="field">
+          <label for="customer-phone">Telefon</label>
+          <input type="tel" id="customer-phone" name="phone" inputmode="tel"
+                 autocomplete="tel" placeholder="0555 000 0000" required>
+        </div>
+
+        <h3 class="block__title">Randevu Özeti</h3>
+        <dl class="summary" id="summary"></dl>
+
+        <button type="submit" class="btn btn--primary btn--block" id="submit-appointment">
+          Randevuyu Oluştur
+        </button>
+      </form>
+    </section>
+
+    <!-- ADIM 4 — ONAY -->
+    <section class="step" id="step-4" aria-labelledby="step-4-title" hidden>
+      <div class="confirm">
+        <h2 class="step__title" id="step-4-title">Randevunuz oluşturuldu.</h2>
+        <p class="confirm__brand">Melek Güzellik Salonu</p>
+        <dl class="summary" id="confirm-summary"></dl>
+        <p class="confirm__note">
+          Değişiklik için bizi arayabilirsiniz:
+          <a href="tel:+905551918058">0555 191 8058</a>
+        </p>
+        <button type="button" class="btn btn--ghost btn--block" id="new-appointment">
+          Yeni Randevu Oluştur
+        </button>
+      </div>
+    </section>
+
+    <!-- Alt aksiyon çubuğu -->
+    <div class="actionbar" id="actionbar">
+      <div class="actionbar__total" id="total-bar">
+        <span class="actionbar__label">Toplam</span>
+        <strong class="actionbar__price" id="total-price">0 TL</strong>
+      </div>
+      <div class="actionbar__buttons">
+        <button type="button" class="btn btn--ghost" id="btn-back" hidden>Geri</button>
+        <button type="button" class="btn btn--primary" id="btn-next">Tarih ve Saat Seç</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>Melek Güzellik Salonu</p>
+      <p><a href="tel:+905551918058">0555 191 8058</a></p>
+      <p><a href="admin/">Yönetici Paneli</a></p>
+    </div>
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/booking.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
