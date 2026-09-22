@@ -1,0 +1,18 @@
+{
+  "name": "melek-guzellik",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Melek Güzellik Salonu — online randevu sistemi",
+  "type": "commonjs",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/server.js",
+    "test": "node tests/logic.js && node --disable-warning=ExperimentalWarning tests/api.js",
+    "test:e2e": "node tests/e2e.js",
+    "test:e2e-api": "node --disable-warning=ExperimentalWarning tests/e2e-api.js",
+    "test:all": "npm test && npm run test:e2e && npm run test:e2e-api"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

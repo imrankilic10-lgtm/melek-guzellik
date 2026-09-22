@@ -23,9 +23,19 @@ function eq(label, got, want) {
 }
 function section(name) { console.log('\n' + name); }
 
+/*
+ * Tarayıcı, HTTP 4xx dönen her isteği "Failed to load resource" diye konsola
+ * yazar. Bunlar uygulama hatası değildir (sunucu yoklaması, hatalı şifre
+ * denemesi gibi bilinçli isteklerdir) ve ayıklanır; gerçek JavaScript
+ * hataları sayılmaya devam eder.
+ */
+const NETWORK_LOG = /Failed to load resource/i;
+
 function watch(page, tag) {
   page.on('console', (m) => {
-    if (m.type() === 'error') consoleErrors.push(tag + ' :: ' + m.text());
+    if (m.type() === 'error' && !NETWORK_LOG.test(m.text())) {
+      consoleErrors.push(tag + ' :: ' + m.text());
+    }
   });
   page.on('pageerror', (e) => consoleErrors.push(tag + ' :: pageerror: ' + e.message));
 }
@@ -216,6 +226,7 @@ async function bookAppointment(page, { service, name, phone, note, dayIndex = 1 
   const firstDate = await page.locator('.day[aria-pressed="true"]').getAttribute('data-date');
   const firstTime = await pickOpenSlot(page);
   await page.click('#btn-next');
+  await page.waitForSelector('#step-3:not([hidden])');
   eq('adım 3 açıldı', await visibleStep(page), 3);
   eq('aksiyon çubuğu gizli', await page.locator('#actionbar').isVisible(), false);
 

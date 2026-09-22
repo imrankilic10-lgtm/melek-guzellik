@@ -1,0 +1,35 @@
+# systemd servis dosyası — sunucunun açılışta başlaması ve çökerse
+# kendini toparlaması için.
+#
+# Kurulum:
+#   sudo cp deploy/melek.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now melek
+
+[Unit]
+Description=Melek Guzellik Salonu randevu sunucusu
+After=network.target
+
+[Service]
+Type=simple
+User=melek
+WorkingDirectory=/var/www/melek-guzellik
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server/server.js
+Restart=always
+RestartSec=5
+
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=MELEK_SECURE_COOKIES=1
+# Şifreyi burada tutmak yerine ayrı bir dosyadan okutmak daha güvenlidir:
+EnvironmentFile=/etc/melek.env
+
+# Güvenlik sıkılaştırma
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/melek-guzellik/data
+
+[Install]
+WantedBy=multi-user.target

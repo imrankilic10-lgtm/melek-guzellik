@@ -36,6 +36,7 @@
   var activeFilter = 'today';
   var searchTerm = '';
   var appointments = [];
+  var serverStats = null;
   var createState = Booking.createState();
   var el = {};
 
@@ -63,23 +64,6 @@
 
   /* ------------------------------- giriş -------------------------------- */
 
-  function isSignedIn() {
-    try {
-      return window.sessionStorage.getItem(SESSION_KEY) === 'ok';
-    } catch (err) {
-      return false;
-    }
-  }
-
-  function setSignedIn(value) {
-    try {
-      if (value) window.sessionStorage.setItem(SESSION_KEY, 'ok');
-      else window.sessionStorage.removeItem(SESSION_KEY);
-    } catch (err) {
-      /* sessionStorage kapalıysa oturum sayfa yenilenene kadar sürer */
-    }
-  }
-
   function showPanel() {
     el.gate.hidden = true;
     el.panel.hidden = false;
@@ -100,22 +84,27 @@
 
   function onGateSubmit(event) {
     event.preventDefault();
-    var value = el.gatePasscode.value;
+    var submitButton = el.gateForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
 
-    if (value === Config.adminPasscode) {
-      setSignedIn(true);
-      showPanel();
-      return;
-    }
-    el.gateError.textContent = 'Şifre hatalı. Lütfen tekrar deneyin.';
-    el.gateError.hidden = false;
-    el.gatePasscode.value = '';
-    el.gatePasscode.focus();
+    Store.admin.login(el.gatePasscode.value)
+      .then(function () {
+        el.gateError.hidden = true;
+        showPanel();
+      })
+      .catch(function (err) {
+        el.gateError.textContent = (err && err.message) || 'Şifre hatalı. Lütfen tekrar deneyin.';
+        el.gateError.hidden = false;
+        el.gatePasscode.value = '';
+        el.gatePasscode.focus();
+      })
+      .then(function () { submitButton.disabled = false; });
   }
 
   function onLogout() {
-    setSignedIn(false);
-    showGate();
+    Store.admin.logout()
+      .catch(function (err) { console.error(err); })
+      .then(function () { showGate(); });
   }
 
   /* ------------------------------ filtreler ----------------------------- */
@@ -162,14 +151,19 @@
 
   function renderStats() {
     var today = todayISO();
-    var todayRows = appointments.filter(function (r) { return r.date === today; });
-    var upcoming = appointments.filter(function (r) { return r.date >= today; });
-    var revenue = todayRows.reduce(function (sum, r) { return sum + (r.total || 0); }, 0);
+    var stats = serverStats || {
+      today: appointments.filter(function (r) { return r.date === today; }).length,
+      upcoming: appointments.filter(function (r) { return r.date >= today; }).length,
+      all: appointments.length,
+      todayRevenue: appointments
+        .filter(function (r) { return r.date === today; })
+        .reduce(function (sum, r) { return sum + (r.total || 0); }, 0)
+    };
 
-    el.statToday.textContent = String(todayRows.length);
-    el.statUpcoming.textContent = String(upcoming.length);
-    el.statAll.textContent = String(appointments.length);
-    el.statRevenue.textContent = Booking.formatPrice(revenue);
+    el.statToday.textContent = String(stats.today);
+    el.statUpcoming.textContent = String(stats.upcoming);
+    el.statAll.textContent = String(stats.all);
+    el.statRevenue.textContent = Booking.formatPrice(stats.todayRevenue);
   }
 
   function statusButton(row, status, label) {
@@ -269,11 +263,18 @@
   }
 
   function load() {
-    return Store.list()
-      .then(function (rows) { appointments = rows; render(); refreshCreateTimes(); })
+    return Store.admin.list()
+      .then(function (data) {
+        appointments = data.appointments || [];
+        serverStats = data.stats || null;
+        render();
+        return refreshCreateTimes();
+      })
       .catch(function (err) {
         console.error(err);
+        if (err && err.status === 401) { showGate(); return; }
         appointments = [];
+        serverStats = null;
         render();
       });
   }
@@ -324,9 +325,10 @@
     refreshCreateTimes();
   }
 
-  /* Seçili tarihe göre uygun saatleri doldurur */
+  /* Seçili tarihe göre uygun saatleri doldurur (API modunda sunucudan) */
   function refreshCreateTimes() {
-    if (!el.createDate) return;
+    if (!el.createDate) return Promise.resolve();
+
     var date = el.createDate.value;
     var select = el.createTime;
     var previous = select.value;
@@ -335,26 +337,39 @@
 
     if (!date) {
       select.appendChild(new Option('Önce tarih seçin', ''));
-      return;
+      return Promise.resolve();
     }
     if (Booking.isDayClosed(date)) {
       select.appendChild(new Option('Salon bu tarihte kapalı', ''));
-      return;
+      return Promise.resolve();
     }
 
     var duration = Booking.getDuration(createState) || 30;
-    var slots = Booking.buildSlots(date, appointments, duration, new Date());
-    select.appendChild(new Option('Saat seçin', ''));
+    select.appendChild(new Option('Saatler yükleniyor…', ''));
 
-    slots.forEach(function (slot) {
-      var label = slot.time + (slot.available ? '' :
-        (slot.reason === 'busy' ? ' — dolu' : ' — geçti'));
-      var option = new Option(label, slot.time);
-      option.disabled = !slot.available;
-      select.appendChild(option);
-    });
+    return Store.getSlots(date, duration)
+      .then(function (slots) {
+        if (el.createDate.value !== date) return;      /* tarih değiştiyse yoksay */
 
-    if (previous) select.value = previous;
+        select.innerHTML = '';
+        select.appendChild(new Option('Saat seçin', ''));
+
+        slots.forEach(function (slot) {
+          var suffix = slot.available ? '' :
+            (slot.reason === 'busy' ? ' — dolu'
+              : slot.reason === 'closed' ? ' — kapalı' : ' — geçti');
+          var option = new Option(slot.time + suffix, slot.time);
+          option.disabled = !slot.available;
+          select.appendChild(option);
+        });
+
+        if (previous) select.value = previous;
+      })
+      .catch(function (err) {
+        console.error(err);
+        select.innerHTML = '';
+        select.appendChild(new Option('Saatler yüklenemedi', ''));
+      });
   }
 
   function toggleCreateForm(open) {
@@ -406,19 +421,14 @@
 
     el.createSubmit.disabled = true;
 
-    Store.list()
-      .then(function (rows) {
-        appointments = rows;
-        if (Booking.hasConflict(rows, createState.date, createState.time,
-                                Booking.getDuration(createState))) {
-          showCreateError(Booking.CONFLICT_MESSAGE);
-          refreshCreateTimes();
-          return null;
-        }
-        var record = Booking.buildAppointment(createState);
-        record.source = 'admin';
-        return Store.create(record);
-      })
+    Store.admin.create({
+      serviceIds: createState.serviceIds.slice(),
+      date: createState.date,
+      time: createState.time,
+      customerName: String(createState.customer.name || '').trim(),
+      phone: Booking.normalizePhone(createState.customer.phone),
+      note: String(createState.customer.note || '').trim()
+    })
       .then(function (saved) {
         if (!saved) return;
         resetCreateForm();
@@ -431,6 +441,7 @@
       .catch(function (err) {
         console.error(err);
         showCreateError(err && err.message ? err.message : 'Randevu kaydedilemedi.');
+        if (err && err.status === 409) refreshCreateTimes();
       })
       .then(function () { el.createSubmit.disabled = false; });
   }
@@ -464,7 +475,7 @@
     if (button.dataset.action === 'status') {
       /* Aynı düğmeye tekrar basmak işareti kaldırır */
       var next = row.status === button.dataset.status ? null : button.dataset.status;
-      Store.update(id, { status: next })
+      Store.admin.updateStatus(id, next)
         .then(function () { return load(); })
         .catch(function (err) { console.error(err); showNotice('Güncellenemedi.', true); });
       return;
@@ -478,7 +489,7 @@
       );
       if (!confirmed) return;
 
-      Store.remove(id)
+      Store.admin.remove(id)
         .then(function () { return load(); })
         .then(function () { showNotice('Randevu silindi.'); })
         .catch(function (err) { console.error(err); showNotice('Randevu silinemedi.', true); });
@@ -557,7 +568,7 @@
       );
       if (!confirmed) return;
 
-      Store.replaceAll(rows)
+      Store.admin.replaceAll(rows)
         .then(function (count) { return load().then(function () { return count; }); })
         .then(function (count) { showNotice(count + ' randevu geri yüklendi.'); })
         .catch(function (err) {
@@ -615,6 +626,16 @@
     el.createSubmit = $('create-submit');
   }
 
+  /* Yedekleme bölümündeki açıklamayı çalışma moduna göre uyarlar */
+  function updateStorageHint() {
+    var hint = document.querySelector('.backup__text');
+    if (!hint) return;
+    hint.textContent = Store.isApi()
+      ? 'Randevular sunucudaki veritabanında saklanır. Yine de düzenli yedek almanız önerilir.'
+      : 'Randevular yalnızca bu tarayıcıda saklanır. Tarayıcı verileri temizlenirse ' +
+        'kayıtlar silinir. Düzenli olarak yedek almanız önerilir.';
+  }
+
   function init() {
     cacheElements();
     applySalonInfo();
@@ -643,8 +664,15 @@
       if (!el.panel.hidden) load();
     });
 
-    if (isSignedIn()) showPanel();
-    else showGate();
+    /* Mod belirlenip oturum doğrulanana kadar iki ekran da gizli kalır */
+    Store.init()
+      .then(function () { return Store.admin.session(); })
+      .then(function (signedIn) {
+        if (signedIn) showPanel();
+        else showGate();
+        updateStorageHint();
+      })
+      .catch(function (err) { console.error(err); showGate(); });
 
     window.MelekAdmin = {
       reload: load,

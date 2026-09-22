@@ -1,8 +1,11 @@
 # Melek Güzellik Salonu — Online Randevu Sistemi
 
-Müşterilerin hizmet seçip gün ve saat belirleyerek randevu oluşturabildiği,
-personelin ise şifre korumalı bir panelden randevuları yönettiği çalışan bir
-randevu uygulaması. Bağımlılık yok: sade HTML, CSS ve JavaScript.
+Müşterilerin hizmet seçip gün ve saat belirleyerek randevu oluşturduğu,
+personelin ise şifre korumalı bir panelden randevuları yönettiği randevu
+sistemi. Ön yüz ve backend birlikte gelir.
+
+**Kurulum gerektirmez:** Node.js dışında hiçbir bağımlılık yoktur.
+`npm install` çalıştırmanız gerekmez, derleme adımı yoktur.
 
 Salon tek personelle çalıştığı için sistem **aynı anda tek randevuya** izin verir.
 
@@ -10,64 +13,69 @@ Salon tek personelle çalıştığı için sistem **aynı anda tek randevuya** i
 
 ## İçindekiler
 
-- [Projeyi Çalıştırma](#projeyi-çalıştırma)
+- [Hızlı Başlangıç](#hızlı-başlangıç)
+- [Çalışma Modları](#çalışma-modları)
 - [İlk Kurulumda Yapılacaklar](#ilk-kurulumda-yapılacaklar)
 - [Özellikler](#özellikler)
 - [Dosya Yapısı](#dosya-yapısı)
 - [Ayarlar](#ayarlar)
+- [API Uçları](#api-uçları)
 - [Güvenlik](#güvenlik)
-- [Veri Saklama ve Yedekleme](#veri-saklama-ve-yedekleme)
-- [Gerçek Veritabanına Geçiş](#gerçek-veritabanına-geçiş)
+- [Sunucuya Kurulum](#sunucuya-kurulum)
+- [Yedekleme](#yedekleme)
 - [Test](#test)
 
 ---
 
-## Projeyi Çalıştırma
+## Hızlı Başlangıç
 
-### 1. Yöntem — Yerel sunucu (önerilen)
-
-Proje klasöründe bir terminal açın:
+Node.js 22.5 veya üstü gerekir (`node --version` ile kontrol edin).
 
 ```bash
-# Python 3 ile
-python3 -m http.server 8000
-
-# veya Node.js ile
-npx http-server -p 8000
+# Yönetici şifrenizi belirleyip sunucuyu başlatın
+MELEK_ADMIN_PASSWORD='kendi-sifreniz' npm start
 ```
-
-Ardından tarayıcıda açın:
 
 | Sayfa | Adres |
 | --- | --- |
-| Müşteri randevu sayfası | <http://localhost:8000/index.html> |
-| Yönetici paneli | <http://localhost:8000/admin/> |
+| Müşteri randevu sayfası | <http://localhost:3000> |
+| Yönetici paneli | <http://localhost:3000/admin/> |
 
-### 2. Yöntem — Dosyayı doğrudan açma
+Randevular `data/melek.db` dosyasındaki SQLite veritabanında saklanır.
+Bu dosya ilk çalıştırmada otomatik oluşturulur.
 
-`index.html` dosyasına çift tıklayarak da açabilirsiniz. Chrome ve Edge'de
-randevu kaydı sorunsuz çalışır; ancak bazı tarayıcılar `file://` adreslerinde
-tarayıcı depolamasını kısıtlar. Bu durumda uygulama hata vermez, randevular
-yalnızca sayfa kapanana kadar bellekte tutulur. Günlük kullanım için 1. yöntem
-tercih edilmelidir.
+---
 
-### Yayına alma
+## Çalışma Modları
 
-Statik bir projedir; derleme adımı yoktur. Klasörü olduğu gibi herhangi bir
-statik hosting hizmetine (Netlify, Vercel, GitHub Pages, paylaşımlı hosting)
-yükleyebilirsiniz.
+Ön yüz açılışta sunucunun olup olmadığını kendisi anlar ve iki moddan
+birinde çalışır. Kod tarafında bir ayar yapmanız gerekmez.
+
+| | **API modu** (önerilen) | **Yerel mod** |
+| --- | --- | --- |
+| Ne zaman | Sunucu çalışıyorken (`npm start`) | Sunucu yokken: `index.html`'i çift tıklayınca veya statik hostingde |
+| Veri nerede | Sunucudaki SQLite veritabanı | Yalnızca o tarayıcının `localStorage` alanı |
+| Cihazlar arası | ✅ Müşterinin telefonundan alınan randevu salondaki bilgisayarda görünür | ❌ Her cihaz kendi verisini görür |
+| Fiyat hesabı | Sunucuda — istemci fiyat gönderemez | Tarayıcıda |
+| Çakışma kontrolü | Sunucuda, işlem (transaction) içinde | Tarayıcıda |
+| Panel şifresi | `MELEK_ADMIN_PASSWORD` (sunucu) | `js/config.js` içindeki `adminPasscode` |
+| Oturum | HttpOnly çerez, sunucuda doğrulanır | `sessionStorage` |
+
+Yerel mod, sunucuya erişilemediğinde sistemin tamamen durmaması için
+vardır; gerçek kullanım için **API modu** tercih edilmelidir.
 
 ---
 
 ## İlk Kurulumda Yapılacaklar
 
-1. **Yönetici şifresini değiştirin.** `js/config.js` içindeki `adminPasscode`
-   satırını kendi şifrenizle değiştirin. Varsayılan şifre herkese açıktır.
-2. **Kapalı günlerinizi girin.** Haftalık izin gününüz varsa `closedWeekdays`
-   ayarını doldurun (örn. pazar için `[0]`).
-3. **Çalışma saatlerinizi kontrol edin.** `timeSlots` listesi randevu
-   verilebilecek saatleri belirler.
-4. **Fiyatları gözden geçirin.** Hizmetler ve fiyatlar `js/data.js` içindedir.
+1. **Yönetici şifresini belirleyin.** `MELEK_ADMIN_PASSWORD` ortam
+   değişkenini ayarlayın. Ayarlanmazsa sunucu varsayılan şifreyle çalışır
+   ve açılışta uyarı verir.
+2. **Kapalı günlerinizi girin.** Haftalık izin gününüz varsa `js/config.js`
+   içindeki `closedWeekdays` ayarını doldurun (örn. pazar için `[0]`).
+3. **Çalışma saatlerinizi kontrol edin.** `js/config.js` → `timeSlots`.
+4. **Fiyatları gözden geçirin.** `js/data.js`.
+5. **Yedeklemeyi kurun.** [Yedekleme](#yedekleme) bölümüne bakın.
 
 ---
 
@@ -77,50 +85,42 @@ yükleyebilirsiniz.
 
 1. **Hizmet seçimi** — kategorilere ayrılmış kartlar, anlık fiyat toplamı,
    seçilenlerin tek tek kaldırılabildiği özet etiketleri
-2. **Tarih ve saat** — 14 günlük takvim, dolu ve geçmiş saatler seçilemez
+2. **Tarih ve saat** — 14 günlük takvim; dolu, geçmiş ve kapalı günler seçilemez
 3. **Bilgiler** — ad soyad, telefon, isteğe bağlı not ve randevu özeti
-4. **Onay** — randevu kaydı, özet ve **takvime ekleme** (.ics indirir)
+4. **Onay** — randevu kaydı, özet ve takvime ekleme (.ics indirir)
 
-Adım göstergesindeki tamamlanmış adımlara tıklayarak geri dönülebilir;
-seçimler korunur.
+Adım göstergesindeki tamamlanmış adımlara tıklanarak geri dönülebilir.
 
 ### Seçim kuralları
 
 - Lazer epilasyonda **birden fazla bölge** seçilebilir, fiyatlar anında toplanır.
 - **Tüm Vücut Tek Seans** seçilirse diğer lazer bölgeleri otomatik kaldırılır;
-  tersi durumda da (bir bölge seçilirse) Tüm Vücut seçimi kaldırılır.
+  bir bölge seçilirse de Tüm Vücut seçimi kaldırılır.
 - El & Ayak, Cilt Bakımı, Kaş & Kirpik kategorilerinde kategori başına tek
-  hizmet seçilir; farklı kategorilerden seçimler birlikte yapılabilir ve
-  toplam fiyata eklenir.
-- Hizmet seçilmeden tarih adımına, tarih seçilmeden saat seçimine, saat
-  seçilmeden bilgiler adımına geçilemez.
+  hizmet seçilir; farklı kategorilerden seçimler birlikte yapılabilir.
+- Bu kurallar API modunda **sunucuda da** uygulanır.
 
 ### Randevu çakışması
 
-Salon tek personelle çalıştığı için çakışma **hizmet süreleri üzerinden**
-hesaplanır: 14:00'te alınan 45 dakikalık bir randevu 14:30 dilimini de
-otomatik kapatır. Dolu saatler müşteri tarafında devre dışı görünür ve kayıt
-anında çakışma bir kez daha kontrol edilir (iki kişi aynı anda işlem yapsa
-bile ikinci kayıt engellenir).
+Çakışma, hizmet süreleri üzerinden hesaplanır: 14:00'te alınan 45 dakikalık
+bir randevu 14:30 dilimini de kapatır. Dolu saatler müşteriye devre dışı
+gösterilir; kayıt anında sunucu kontrolü tekrarlar.
 
-> Yalnızca birebir saat eşleşmesini engellemek isterseniz `js/booking.js`
-> içindeki `hasConflict()` fonksiyonunu sadeleştirmeniz yeterlidir.
+Kontrol ile kayıt **tek bir veritabanı işlemi içinde** yapılır. İki müşteri
+aynı saati aynı anda seçse bile yalnızca biri kaydedilir — bu, otomatik
+testte beş eşzamanlı istekle doğrulanmaktadır.
 
 ### Yönetici paneli (`/admin`)
 
-- **Şifre korumalı giriş** — oturum sekme kapanana kadar sürer, "Çıkış" butonu var
-- **Telefonla gelen randevu ekleme** — hizmet, tarih, saat, isim, telefon ve not;
-  dolu saatler listede kapalı gelir, çakışma kontrolü uygulanır
+- **Şifre korumalı giriş** — sunucuda doğrulanır, HttpOnly çerez kullanılır
+- **Telefonla gelen randevu ekleme** — dolu saatler listede kapalı gelir
 - **Filtreler** — Bugün / Yarın / Bu Hafta / Yaklaşan / Geçmiş / Tümü
 - **Arama** — isim, telefon, hizmet, bölge, not veya tarihe göre
-- **Özet** — bugünkü randevu, yaklaşan randevu, toplam kayıt ve günlük ciro
-- **Durum işaretleme** — Geldi / Gelmedi (tekrar basınca işaret kalkar)
+- **Özet** — bugünkü randevu, yaklaşan randevu, toplam kayıt, günlük ciro
+- **Durum işaretleme** — Geldi / Gelmedi
 - **Silme** — onay sorulur
 - **Yazdırma** — günün listesi için sade çıktı
-- **Yedekleme** — JSON yedek indirme, JSON'dan geri yükleme, Excel için CSV
-
-Randevular tarih ve saate göre sıralanır; müşteri adı, tıklanabilir telefon,
-hizmet, lazer bölgeleri, yaklaşık süre, not ve toplam ücret gösterilir.
+- **Yedekleme** — JSON yedek indirme, geri yükleme, Excel için CSV
 
 ---
 
@@ -128,177 +128,263 @@ hizmet, lazer bölgeleri, yaklaşık süre, not ve toplam ücret gösterilir.
 
 ```
 melek-guzellik/
-├── index.html          Müşteri randevu sayfası
-├── admin/
-│   └── index.html      Yönetici paneli
-├── css/
-│   └── style.css       Tüm stiller (müşteri + admin + yazdırma)
-├── js/
-│   ├── config.js       SALON AYARLARI — şifre, saatler, kapalı günler
-│   ├── data.js         Hizmet katalogu: fiyatlar ve süreler
-│   ├── store.js        Randevu deposu (MVP: localStorage)
-│   ├── booking.js      Saf iş mantığı: seçim, fiyat, çakışma, doğrulama, .ics
-│   ├── app.js          Müşteri akışının arayüz denetleyicisi
-│   └── admin.js        Yönetici panelinin arayüz denetleyicisi
+├── index.html              Müşteri randevu sayfası
+├── admin/index.html        Yönetici paneli
+├── css/style.css           Tüm stiller (müşteri + admin + yazdırma)
+│
+├── js/                     Ön yüz (tarayıcıda çalışır)
+│   ├── config.js           SALON AYARLARI — saatler, kapalı günler
+│   ├── data.js             Hizmet katalogu: fiyatlar ve süreler
+│   ├── booking.js          Saf iş mantığı — sunucu da bunu kullanır
+│   ├── store.js            Veri katmanı: API / yerel mod seçimi
+│   ├── app.js              Müşteri akışı arayüzü
+│   └── admin.js            Yönetici paneli arayüzü
+│
+├── server/                 Backend (Node.js, bağımlılıksız)
+│   ├── server.js           HTTP sunucusu, rotalar, statik dosyalar
+│   ├── config.js           Sunucu ayarları (ortam değişkenleri)
+│   ├── db.js               SQLite bağlantısı ve şema
+│   ├── appointments.js     Randevu kuralları ve veri erişimi
+│   ├── auth.js             Oturum, şifre, deneme sınırı
+│   └── http-helpers.js     İstek/yanıt yardımcıları
+│
+├── deploy/                 Sunucuya kurulum örnekleri
+│   ├── melek.service       systemd servis dosyası
+│   ├── nginx.conf          HTTPS + ters vekil örneği
+│   └── yedekle.sh          Günlük otomatik yedek betiği
+│
 ├── tests/
-│   ├── logic.js        İş mantığı testleri (tarayıcı gerekmez)
-│   └── e2e.js          Uçtan uca tarayıcı testleri (Playwright)
-└── README.md
+│   ├── logic.js            İş mantığı testleri
+│   ├── api.js              Backend API testleri
+│   ├── e2e.js              Tarayıcı testleri (yerel mod)
+│   └── e2e-api.js          Tarayıcı testleri (API modu)
+│
+├── data/melek.db           Veritabanı (otomatik oluşur, git'e girmez)
+├── .env.example            Ortam değişkeni örneği
+└── package.json
 ```
+
+`js/booking.js` hem tarayıcıda hem sunucuda çalışır. Fiyat hesabı, çakışma
+mantığı ve doğrulama kuralları böylece tek bir yerde tanımlıdır.
 
 ---
 
 ## Ayarlar
 
-Günlük kullanımda değiştirilecek her şey **`js/config.js`** dosyasındadır:
+### Salon ayarları — `js/config.js`
 
 | Ayar | Açıklama |
 | --- | --- |
-| `salon` | Salon adı, telefon numarası ve WhatsApp numarası |
-| `adminPasscode` | Yönetici paneli şifresi — **mutlaka değiştirin** |
+| `salon` | Salon adı ve telefon numarası (sayfalardaki tüm arama bağlantıları buradan beslenir) |
 | `timeSlots` | Randevu verilebilecek saatler |
 | `bookableDays` | Müşteriye kaç günlük takvim gösterilecek (varsayılan 14) |
 | `closedWeekdays` | Haftalık kapalı günler — `0` pazar, `6` cumartesi |
 | `closedDates` | Tatil/izin tarihleri, örn. `['2026-10-29']` |
 | `minimumNoticeMinutes` | Randevunun en az kaç dakika öncesinden alınabileceği |
+| `adminPasscode` | **Yalnızca yerel modda** geçerli panel şifresi |
 
-Fiyatlar, süreler ve kategoriler **`js/data.js`** içindedir. Yeni hizmet
-eklemek için ilgili kategoriye bir satır eklemeniz yeterlidir; başka dosyaya
-dokunmak gerekmez:
+### Sunucu ayarları — ortam değişkenleri
+
+| Değişken | Varsayılan | Açıklama |
+| --- | --- | --- |
+| `MELEK_ADMIN_PASSWORD` | `melek2026` | Panel şifresi — **mutlaka değiştirin** |
+| `PORT` | `3000` | Dinlenecek port |
+| `MELEK_DB` | `data/melek.db` | Veritabanı dosyasının yolu |
+| `MELEK_SECURE_COOKIES` | kapalı | HTTPS arkasındaysanız `1` yapın |
+| `MELEK_SESSION_HOURS` | `12` | Oturumun açık kalma süresi |
+| `MELEK_ALLOWED_ORIGIN` | boş | Ön yüz ayrı adresteyse o adres |
+| `MELEK_LOGIN_MAX_ATTEMPTS` | `10` | Giriş denemesi sınırı |
+
+Örnek için `.env.example` dosyasına bakın.
+
+### Fiyat ve hizmetler — `js/data.js`
+
+Yeni hizmet eklemek için ilgili kategoriye bir satır eklemek yeterlidir:
 
 ```js
 { id: 'yeni-hizmet', name: 'Yeni Hizmet', price: 750, duration: 45 }
 ```
 
-Süreler (`duration`) müşteriye hizmet kartlarında gösterilmez, ancak randevu
-çakışmasının hesaplanmasında kullanılır ve özet ekranında "tahmini süre"
-olarak görünür.
+`duration` müşteriye hizmet kartlarında gösterilmez; çakışma hesabında
+kullanılır ve özette "tahmini süre" olarak görünür.
+
+> Fiyat değişikliği geçmiş randevuları etkilemez: her randevu, oluşturulduğu
+> andaki hizmet ve fiyat bilgisini kendi içinde saklar.
+
+---
+
+## API Uçları
+
+### Herkese açık
+
+| Yöntem | Adres | Açıklama |
+| --- | --- | --- |
+| `GET` | `/api/health` | Sunucu ayakta mı |
+| `GET` | `/api/services` | Hizmet katalogu |
+| `GET` | `/api/days` | Takvim günleri (kapalı gün bilgisiyle) |
+| `GET` | `/api/availability?date=&duration=` | Bir günün saat durumu |
+| `POST` | `/api/appointments` | Randevu oluştur |
+
+`/api/availability` yalnızca `{ time, available, reason }` döner. Başka
+müşterilerin adı, telefonu veya hizmeti **hiçbir zaman** açığa çıkmaz.
+
+`POST /api/appointments` gövdesi:
+
+```json
+{
+  "serviceIds": ["lazer-tum-yuz", "lazer-cene"],
+  "date": "2026-10-10",
+  "time": "14:00",
+  "customerName": "Ayşe Yılmaz",
+  "phone": "05551234567",
+  "note": "İlk seansım"
+}
+```
+
+> Fiyat, süre ve hizmet adları istemciden **alınmaz**. Gövdeye `total`
+> yazsanız bile yoksayılır; tutarlar sunucudaki katalogdan hesaplanır.
+
+### Giriş gerektiren
+
+| Yöntem | Adres | Açıklama |
+| --- | --- | --- |
+| `POST` | `/api/admin/login` | Giriş (çerez verir) |
+| `POST` | `/api/admin/logout` | Çıkış |
+| `GET` | `/api/admin/session` | Oturum durumu |
+| `GET` | `/api/admin/appointments` | Tüm randevular + istatistikler |
+| `POST` | `/api/admin/appointments` | Elle randevu ekle |
+| `PATCH` | `/api/admin/appointments/:id` | Durum güncelle |
+| `DELETE` | `/api/admin/appointments/:id` | Randevu sil |
+| `POST` | `/api/admin/appointments/import` | Yedekten geri yükle |
 
 ---
 
 ## Güvenlik
 
-> **Yönetici şifresi gerçek bir güvenlik önlemi değildir.**
->
-> Şifre tarayıcıda, `js/config.js` dosyasında saklanır. Bu dosyayı açmayı
-> bilen biri şifreyi görebilir. Panelin şifreyle korunması yalnızca paneli
-> kazara veya meraktan açılmaktan korur.
->
-> Panelde müşteri adı ve telefon numarası gibi kişisel veriler bulunur. Siteyi
-> internete açıyorsanız, `/admin` klasörünü **hosting tarafında** da koruyun:
->
-> - Apache kullanıyorsanız `.htpasswd` ile HTTP Basic Auth
-> - Netlify kullanıyorsanız site veya klasör bazlı parola koruması
-> - Ya da paneli internete hiç açmayıp yalnızca salondaki cihazda kullanın
->
-> Gerçek bir kullanıcı sistemi ancak backend'e geçildiğinde mümkündür.
+Sistemde uygulananlar:
+
+- Fiyat, süre ve hizmet adları sunucuda hesaplanır; istemci gönderemez.
+- Müşteri tarafına başka randevuların kişisel bilgileri açılmaz.
+- Şifre sabit zamanlı karşılaştırılır, tarayıcıda saklanmaz.
+- Oturum anahtarı rastgele üretilir, veritabanında tutulur, süresi dolar.
+- Çerez `HttpOnly` ve `SameSite=Lax` işaretlidir.
+- Giriş denemeleri IP başına sınırlanır (varsayılan: 15 dakikada 10).
+- `data/`, `server/`, `tests/` ve `.git/` dizinleri web üzerinden sunulmaz;
+  dizin dışına çıkma (path traversal) denemeleri reddedilir.
+- Gövde boyutu sınırlanır, `X-Content-Type-Options` ve `X-Frame-Options`
+  başlıkları gönderilir.
+
+Sizin yapmanız gerekenler:
+
+1. **Şifreyi değiştirin.** `MELEK_ADMIN_PASSWORD` ayarlanmazsa sunucu
+   açılışta uyarı basar.
+2. **HTTPS kullanın.** Panel üzerinden müşteri adı ve telefonu geçer.
+   `deploy/nginx.conf` örneğine bakın, `MELEK_SECURE_COOKIES=1` yapın.
+3. **İsterseniz paneli ikinci bir katmanla koruyun.** nginx `auth_basic`
+   örneği `deploy/nginx.conf` içinde yorum satırı olarak hazır.
+
+> **Yerel mod uyarısı:** Sunucusuz kullanımda panel şifresi `js/config.js`
+> içindedir ve dosyayı açan herkes görebilir. Bu yalnızca paneli kazara
+> açılmaktan korur. Gerçek koruma API modunda sağlanır.
 
 ---
 
-## Veri Saklama ve Yedekleme
+## Sunucuya Kurulum
 
-> **Önemli — MVP notu:** Bu sürümde randevular tarayıcının `localStorage`
-> alanında, `melekAppointments` anahtarı altında JSON olarak saklanır.
-> Veriler **sunucuda değil, o cihazın tarayıcısında** tutulur. Bunun pratik
-> sonuçları:
->
-> - Müşterinin telefonundan oluşturduğu randevu, salondaki bilgisayarın
->   yönetici panelinde **görünmez**.
-> - Tarayıcı verileri temizlenirse randevular silinir.
->
-> Bu nedenle panelde yedekleme bölümü bulunur. Düzenli olarak **Yedek İndir
-> (JSON)** ile kayıt alın; gerektiğinde **Yedekten Geri Yükle** ile aynı
-> dosyadan geri dönebilirsiniz.
->
-> Sistemi gerçek kullanıma alacaksanız bir backend'e geçilmesi gerekir.
+### Kendi sunucunuzda (VPS)
+
+```bash
+# 1. Dosyaları sunucuya kopyalayın
+sudo mkdir -p /var/www/melek-guzellik
+sudo rsync -a ./ /var/www/melek-guzellik/
+
+# 2. Şifreyi ayarlayın
+echo "MELEK_ADMIN_PASSWORD='guclu-bir-sifre'" | sudo tee /etc/melek.env
+sudo chmod 600 /etc/melek.env
+
+# 3. Servisi kurun
+sudo cp deploy/melek.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now melek
+
+# 4. nginx + HTTPS
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/melek
+sudo ln -s /etc/nginx/sites-available/melek /etc/nginx/sites-enabled/
+sudo certbot --nginx -d melekguzellik.com
+```
+
+Durum kontrolü: `sudo systemctl status melek`
+Günlükler: `sudo journalctl -u melek -f`
+
+### Hazır platformlarda (Railway, Render, Fly.io)
+
+Depoyu bağlayın ve şu ayarları girin:
+
+- Başlatma komutu: `npm start`
+- Ortam değişkeni: `MELEK_ADMIN_PASSWORD`
+- **Kalıcı disk** bağlayın ve `MELEK_DB` değişkenini o diske yönlendirin
+  (örn. `/data/melek.db`). Aksi halde her dağıtımda randevular silinir.
+
+### Statik hosting (Netlify, GitHub Pages)
+
+Bu platformlar Node.js çalıştırmaz; sistem **yerel modda** çalışır ve
+cihazlar arası paylaşım olmaz. Salon için uygun değildir.
 
 ---
 
-## Gerçek Veritabanına Geçiş
+## Yedekleme
 
-Veri erişimi tamamen `js/store.js` içinde toplanmıştır ve tüm metotlar
-`Promise` döner. Çağıran kod (`app.js`, `admin.js`) depolamanın nasıl
-çalıştığını bilmez; bu yüzden backend'e geçerken **yalnızca bu dosya**
-değiştirilir:
+Veritabanı tek bir dosyadır: `data/melek.db`.
 
-```js
-MelekStore.list       = ()       => fetch('/api/randevular').then(r => r.json());
-MelekStore.create     = (a)      => fetch('/api/randevular', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify(a)
-                                    }).then(r => r.json());
-MelekStore.update     = (id, p)  => fetch('/api/randevular/' + id, {
-                                      method: 'PATCH',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify(p)
-                                    }).then(r => r.json());
-MelekStore.remove     = (id)     => fetch('/api/randevular/' + id, { method: 'DELETE' });
+**Otomatik (önerilen).** `deploy/yedekle.sh` her gece yedek alır ve 30
+günden eskileri siler:
+
+```bash
+crontab -e
+0 3 * * * /var/www/melek-guzellik/deploy/yedekle.sh
 ```
 
-Randevu kaydının yapısı:
+**Elle.** Panelden **Yedek İndir (JSON)** ile dosya alabilir, **Yedekten
+Geri Yükle** ile aynı dosyadan dönebilirsiniz. Geri yükleme mevcut
+kayıtların tamamını değiştirir; onay sorulur.
 
-```json
-{
-  "id": "apt_...",
-  "createdAt": "2026-09-24T10:00:00.000Z",
-  "customerName": "Ayşe Yılmaz",
-  "phone": "05551234567",
-  "note": "İlk seansım",
-  "date": "2026-09-24",
-  "time": "12:00",
-  "serviceIds": ["lazer-tum-yuz", "lazer-cene"],
-  "services": [{ "id": "...", "name": "...", "price": 400, "duration": 30 }],
-  "serviceLabel": "Lazer Epilasyon",
-  "regions": ["Tüm Yüz", "Çene"],
-  "total": 500,
-  "duration": 45,
-  "status": null,
-  "source": "admin"
-}
-```
-
-Çakışma kontrolünü sunucuya taşırken `booking.js` içindeki `hasConflict()`
-mantığı birebir kullanılabilir. Backend'e geçildiğinde çakışma kontrolünün
-**sunucu tarafında da** yapılması gerekir.
+> Veritabanı dosyasını kopyalarken sunucu çalışıyorsa `cp` yerine
+> `sqlite3 data/melek.db ".backup hedef.db"` kullanın — betik bunu yapar.
 
 ---
 
 ## Test
 
-İki test paketi vardır.
-
-### İş mantığı testleri (hızlı, tarayıcı gerekmez)
+Dört test paketi vardır; toplam **383 kontrol**.
 
 ```bash
-node tests/logic.js
+npm test            # iş mantığı (78) + API (96)  — tarayıcı gerekmez
+npm run test:e2e    # tarayıcı, yerel mod (170)   — Playwright gerekir
+npm run test:e2e-api # tarayıcı, API modu (39)
+npm run test:all    # hepsi
 ```
 
-Fiyat hesaplama, seçim kuralları, çakışma, kapalı günler, doğrulamalar,
-biçimlendirme ve takvim dosyası üretimini kapsar.
-
-### Uçtan uca testler (gerçek Chromium)
+`npm run test:e2e` için önce statik bir sunucu gerekir:
 
 ```bash
-# 1. terminal
-python3 -m http.server 8123
-
-# 2. terminal
-node tests/e2e.js
+python3 -m http.server 8123     # ayrı bir terminalde
 ```
 
-Şartnamedeki 12 senaryonun tamamı ile giriş koruması, elle randevu ekleme,
-arama, filtreler, durum işaretleme, yedekleme/geri yükleme, erişilebilirlik,
-console hatası kontrolü ve 375–1440px responsive kontrolünü kapsar.
+Diğer paketler kendi sunucularını geçici bir veritabanıyla kendileri
+başlatır; mevcut verilerinize dokunmazlar.
 
-**Son çalıştırma: 78 + 165 = 243 kontrol başarılı, 0 başarısız, console hatası yok.**
+Kapsam: şartnamedeki 12 senaryo, fiyat bütünlüğü, kişisel veri sızıntısı,
+eşzamanlı istek yarışı, oturum ve yetki kontrolleri, giriş deneme sınırı,
+dosya erişim koruması, yedekleme/geri yükleme, erişilebilirlik, console
+hatası kontrolü ve 375–1440px responsive kontrolü.
+
+**Son çalıştırma: 383 kontrol başarılı, 0 başarısız, console hatası yok.**
 
 ---
 
 ## Tarayıcı Desteği
 
 Chrome, Edge, Safari, Firefox'un güncel sürümleri ve mobil tarayıcılar.
-Kurulum ve derleme gerektirmez.
 
 ## İletişim
 

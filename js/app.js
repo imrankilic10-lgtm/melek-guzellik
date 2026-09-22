@@ -12,7 +12,7 @@
   var state = Booking.createState();
   var currentStep = 1;
   var maxStepReached = 1;     /* adım göstergesinden geri dönebilmek için */
-  var appointments = [];      /* çakışma kontrolü için mevcut randevular */
+  var slots = [];             /* seçili günün saat durumu (sunucudan veya yerelden) */
   var lastAppointment = null;
   var submitting = false;
 
@@ -128,11 +128,9 @@
     updateTotal();
     clearNotice();
 
-    /* Süre değişince seçili saat geçersiz kalmış olabilir */
-    if (state.date && state.time &&
-        Booking.hasConflict(appointments, state.date, state.time, Booking.getDuration(state))) {
-      state.time = null;
-    }
+    /* Süre değişince seçili saat geçersiz kalmış olabilir;
+       doğrulama adım 2'ye girerken sunucudan tazelenir. */
+    if (state.date && state.time) state.time = null;
   }
 
   function clearAllServices() {
@@ -175,6 +173,7 @@
     el.days.appendChild(fragment);
   }
 
+  /* Seçili gün için saatleri getirir ve çizer (API veya yerel mod) */
   function renderSlots() {
     el.slots.innerHTML = '';
 
@@ -182,12 +181,38 @@
       el.timeHint.hidden = false;
       el.timeHint.textContent = 'Saatleri görmek için önce bir tarih seçin.';
       el.legend.hidden = true;
-      return;
+      return Promise.resolve();
     }
 
+    el.timeHint.hidden = false;
+    el.timeHint.textContent = 'Saatler yükleniyor…';
+
     var duration = Booking.getDuration(state);
-    var slots = Booking.buildSlots(state.date, appointments, duration, new Date());
-    var openCount = slots.filter(function (slot) { return slot.available; }).length;
+    var requestedDate = state.date;
+
+    return Store.getSlots(requestedDate, duration)
+      .catch(function (err) {
+        console.error(err);
+        return null;
+      })
+      .then(function (result) {
+        /* Kullanıcı bu arada başka gün seçtiyse eski yanıtı yoksay */
+        if (requestedDate !== state.date) return;
+
+        if (!result) {
+          el.timeHint.hidden = false;
+          el.timeHint.textContent = 'Saatler yüklenemedi. Lütfen tekrar deneyin.';
+          el.legend.hidden = true;
+          return;
+        }
+        slots = result;
+        drawSlots(result);
+      });
+  }
+
+  function drawSlots(slotList) {
+    el.slots.innerHTML = '';
+    var openCount = slotList.filter(function (slot) { return slot.available; }).length;
 
     el.timeHint.hidden = openCount > 0;
     if (!openCount) {
@@ -195,10 +220,10 @@
         ? 'Salonumuz bu tarihte kapalıdır. Lütfen başka bir gün seçin.'
         : 'Bu gün için uygun saat kalmadı. Lütfen başka bir gün seçin.';
     }
-    el.legend.hidden = openCount === slots.length || openCount === 0;
+    el.legend.hidden = openCount === slotList.length || openCount === 0;
 
     var fragment = document.createDocumentFragment();
-    slots.forEach(function (slot) {
+    slotList.forEach(function (slot) {
       var button = createEl('button', 'slot', slot.time);
       button.type = 'button';
       button.dataset.time = slot.time;
@@ -323,28 +348,44 @@
     if (!check.ok) { showNotice(check.message); return; }
 
     clearNotice();
-    return refreshAppointments().then(function () {
-      renderDays();
-      renderSlots();
-      setStep(2);
-    });
+    renderDays();
+    setStep(2);
+    return renderSlots();
   }
 
   function goToCustomerStep() {
     var check = Booking.validateSchedule(state);
     if (!check.ok) { showNotice(check.message); return; }
 
-    return refreshAppointments().then(function () {
-      if (Booking.hasConflict(appointments, state.date, state.time, Booking.getDuration(state))) {
-        state.time = null;
-        renderSlots();
-        showNotice(Booking.CONFLICT_MESSAGE);
-        return;
-      }
-      clearNotice();
-      renderCurrentSummary();
-      setStep(3);
-    });
+    var chosen = state.time;
+    var label = el.btnNext.textContent;
+    el.btnNext.disabled = true;
+    el.btnNext.textContent = 'Kontrol ediliyor…';
+
+    /* Saat hâlâ boş mu? (başkası bu arada almış olabilir) */
+    return Store.getSlots(state.date, Booking.getDuration(state))
+      .then(function (result) {
+        slots = result;
+        var match = result.filter(function (slot) { return slot.time === chosen; })[0];
+
+        if (!match || !match.available) {
+          state.time = null;
+          drawSlots(result);
+          showNotice(Booking.CONFLICT_MESSAGE);
+          return;
+        }
+        clearNotice();
+        renderCurrentSummary();
+        setStep(3);
+      })
+      .catch(function (err) {
+        console.error(err);
+        showNotice('Saatler kontrol edilemedi. Lütfen tekrar deneyin.');
+      })
+      .then(function () {
+        el.btnNext.disabled = false;
+        if (currentStep === 2) el.btnNext.textContent = label;
+      });
   }
 
   function onNextClick() {
@@ -366,7 +407,7 @@
     if (target >= currentStep || currentStep === 4) return;
 
     clearNotice();
-    if (target === 2) { renderDays(); renderSlots(); }
+    if (target === 2) { renderDays(); setStep(target); renderSlots(); return; }
     setStep(target);
   }
 
@@ -402,17 +443,14 @@
     el.submitButton.disabled = true;
     el.submitButton.textContent = 'Kaydediliyor…';
 
-    refreshAppointments()
-      .then(function () {
-        if (Booking.hasConflict(appointments, state.date, state.time, Booking.getDuration(state))) {
-          state.time = null;
-          showNotice(Booking.CONFLICT_MESSAGE);
-          renderSlots();
-          setStep(2);
-          return null;
-        }
-        return Store.create(Booking.buildAppointment(state));
-      })
+    Store.createAppointment({
+      serviceIds: state.serviceIds.slice(),
+      date: state.date,
+      time: state.time,
+      customerName: String(state.customer.name || '').trim(),
+      phone: Booking.normalizePhone(state.customer.phone),
+      note: String(state.customer.note || '').trim()
+    })
       .then(function (saved) {
         if (!saved) return;
         lastAppointment = saved;
@@ -430,6 +468,12 @@
       .catch(function (err) {
         console.error(err);
         showNotice(err && err.message ? err.message : 'Randevu kaydedilemedi. Lütfen tekrar deneyin.');
+        /* Saat kapıldıysa kullanıcıyı saat seçimine geri al */
+        if (err && err.status === 409) {
+          state.time = null;
+          setStep(2);
+          renderSlots();
+        }
       })
       .then(function () {
         submitting = false;
@@ -470,18 +514,6 @@
     updateTotal();
     clearNotice();
     setStep(1);
-  }
-
-  /* ------------------------------ Veri ---------------------------------- */
-
-  function refreshAppointments() {
-    return Store.list()
-      .then(function (rows) { appointments = rows; return rows; })
-      .catch(function (err) {
-        console.error(err);
-        appointments = [];
-        return [];
-      });
   }
 
   /* ------------------------------ Başlat -------------------------------- */
@@ -552,21 +584,20 @@
     $('add-to-calendar').addEventListener('click', onAddToCalendar);
     $('new-appointment').addEventListener('click', startOver);
 
-    /* Başka sekmede (ör. yönetici panelinde) yapılan değişiklikleri yakala */
+    /* Yerel modda başka sekmedeki (ör. yönetici paneli) değişiklikleri yakala */
     window.addEventListener('storage', function (event) {
       if (event.key && event.key !== Store.STORAGE_KEY) return;
-      refreshAppointments().then(function () {
-        if (currentStep === 2) renderSlots();
-      });
+      if (currentStep === 2) renderSlots();
     });
 
-    refreshAppointments();
+    Store.init();
 
     /* Test ve hata ayıklama için okunur durum */
     window.MelekApp = {
       getState: function () { return state; },
       getStep: function () { return currentStep; },
       getLastAppointment: function () { return lastAppointment; },
+      getSlots: function () { return slots.slice(); },
       reset: startOver
     };
   }
