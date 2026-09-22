@@ -1,16 +1,57 @@
 /*
- * tests/e2e.js — Uçtan uca tarayıcı testleri (Playwright + Chromium).
+ * tests/e2e.js — Uçtan uca tarayıcı testleri: YEREL MOD (Playwright).
  *
- * Çalıştırma:
- *   1. terminal:  python3 -m http.server 8123
- *   2. terminal:  node tests/e2e.js
+ * Sunucusuz kullanımı sınar. Bunun için dosyaları yalnızca statik olarak
+ * sunan küçük bir sunucu başlatır; /api/* isteklerine 404 döner, böylece
+ * ön yüz yerel moda düşer. (API modu: tests/e2e-api.js)
+ *
+ * Çalıştırma:  node tests/e2e.js
  */
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 const { chromium } = require('playwright');
 
-const BASE = process.env.BASE_URL || 'http://127.0.0.1:8123';
+const ROOT = path.join(__dirname, '..');
+const STATIC_PORT = Number(process.env.STATIC_PORT || 8123);
+const BASE = process.env.BASE_URL || ('http://127.0.0.1:' + STATIC_PORT);
+
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml'
+};
+
+/* Yalnızca statik dosya sunar; API uçları yoktur (yerel mod koşulu) */
+const staticServer = http.createServer((req, res) => {
+  const urlPath = decodeURIComponent(req.url.split('?')[0]);
+
+  if (urlPath.startsWith('/api/')) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end('{"error":"yok"}');
+    return;
+  }
+
+  let filePath = path.resolve(ROOT, urlPath.replace(/^\/+/, '') || 'index.html');
+  if (!filePath.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
+
+  try {
+    if (fs.statSync(filePath).isDirectory()) filePath = path.join(filePath, 'index.html');
+    const body = fs.readFileSync(filePath);
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+      'Content-Length': body.length,
+      'Cache-Control': 'no-store'
+    });
+    res.end(body);
+  } catch (err) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Bulunamadı');
+  }
+});
 let passed = 0, failed = 0;
 const consoleErrors = [];
 
@@ -110,6 +151,11 @@ async function bookAppointment(page, { service, name, phone, note, dayIndex = 1 
 }
 
 (async () => {
+  await new Promise((resolve, reject) => {
+    staticServer.once('error', reject);
+    staticServer.listen(STATIC_PORT, '127.0.0.1', resolve);
+  });
+
   const browser = await chromium.launch();
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -651,6 +697,7 @@ async function bookAppointment(page, { service, name, phone, note, dayIndex = 1 
 
   await clearStore(page);
   await browser.close();
+  await new Promise((resolve) => staticServer.close(resolve));
 
   /* ------------------------------- sonuç -------------------------------- */
   console.log('\n================ SONUÇ ================');
@@ -662,4 +709,8 @@ async function bookAppointment(page, { service, name, phone, note, dayIndex = 1 
     console.log('Console hatası: yok');
   }
   process.exit(failed || consoleErrors.length ? 1 : 0);
-})().catch((err) => { console.error(err); process.exit(1); });
+})().catch((err) => {
+  console.error(err);
+  try { staticServer.close(); } catch (e) { /* yoksayılır */ }
+  process.exit(1);
+});

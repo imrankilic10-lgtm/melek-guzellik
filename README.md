@@ -334,14 +334,25 @@ sudo certbot --nginx -d melekguzellik.com
 Durum kontrolü: `sudo systemctl status melek`
 Günlükler: `sudo journalctl -u melek -f`
 
-### Hazır platformlarda (Railway, Render, Fly.io)
+### Railway
 
-Depoyu bağlayın ve şu ayarları girin:
+Adım adım rehber: **[deploy/RAILWAY.md](deploy/RAILWAY.md)**
 
-- Başlatma komutu: `npm start`
-- Ortam değişkeni: `MELEK_ADMIN_PASSWORD`
-- **Kalıcı disk** bağlayın ve `MELEK_DB` değişkenini o diske yönlendirin
-  (örn. `/data/melek.db`). Aksi halde her dağıtımda randevular silinir.
+Depodaki `railway.json` ve `.nvmrc` sayesinde başlatma komutu ve Node.js
+sürümü otomatik ayarlanır. Yapmanız gerekenler:
+
+1. Kalıcı disk (Volume) ekleyin, mount path `/data`
+2. Değişkenleri girin: `MELEK_ADMIN_PASSWORD`, `MELEK_DB=/data/melek.db`,
+   `MELEK_SECURE_COOKIES=1`
+3. `PORT` değişkenini **elle eklemeyin** — Railway kendisi verir
+
+> **Kalıcı disk şarttır.** Eklenmezse her yeni dağıtımda tüm randevular
+> silinir.
+
+### Diğer platformlar (Render, Fly.io)
+
+Aynı mantık geçerlidir: başlatma komutu `npm start`, kalıcı bir disk
+bağlayın ve `MELEK_DB` değişkenini o diske yönlendirin.
 
 ### Statik hosting (Netlify, GitHub Pages)
 
@@ -382,14 +393,10 @@ npm run test:e2e-api # tarayıcı, API modu (39)
 npm run test:all    # hepsi
 ```
 
-`npm run test:e2e` için önce statik bir sunucu gerekir:
-
-```bash
-python3 -m http.server 8123     # ayrı bir terminalde
-```
-
-Diğer paketler kendi sunucularını geçici bir veritabanıyla kendileri
-başlatır; mevcut verilerinize dokunmazlar.
+Dört paket de kendi sunucusunu (ve gerekiyorsa geçici veritabanını)
+kendisi başlatır; elle bir şey çalıştırmanız gerekmez ve mevcut
+verilerinize dokunmazlar. Tarayıcı testleri için Playwright kurulu
+olmalıdır (`npm i -g playwright`).
 
 Kapsam: şartnamedeki 12 senaryo, fiyat bütünlüğü, kişisel veri sızıntısı,
 eşzamanlı istek yarışı, oturum ve yetki kontrolleri, giriş deneme sınırı,

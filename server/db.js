@@ -9,9 +9,27 @@
 
 const fs = require('fs');
 const path = require('path');
-const { DatabaseSync } = require('node:sqlite');
 
 const config = require('./config.js');
+
+/*
+ * Veritabanı sürücüsü Node'un içinde gelir ama Node 22.5 ve üstünde
+ * bulunur. Eski bir sürümde çalıştırılırsa anlaşılır bir mesaj verelim.
+ */
+let DatabaseSync;
+try {
+  ({ DatabaseSync } = require('node:sqlite'));
+} catch (err) {
+  console.error('');
+  console.error('  Bu uygulama Node.js 22.5 veya üstünü gerektirir.');
+  console.error('  Şu an çalışan sürüm: ' + process.version);
+  console.error('');
+  console.error('  Çözüm: Node.js sürümünü yükseltin (https://nodejs.org).');
+  console.error('  Railway/Render kullanıyorsanız .nvmrc dosyasının');
+  console.error('  depoda olduğundan ve "22" yazdığından emin olun.');
+  console.error('');
+  process.exit(1);
+}
 
 let db = null;
 
