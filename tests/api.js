@@ -301,6 +301,57 @@ const iso = (offsetDays) => Booking.toISODate(Booking.addDays(new Date(), offset
   r = await api('POST', '/api/admin/login', { passcode: PASSWORD });
   eq('sınır doğru şifreyi de engeller', r.status, 429);
 
+  /* ===================== ŞİFRE DOSYASI ============================== */
+
+  section('Şifre dosyası (MELEK_ADMIN_PASSWORD_FILE)');
+  /*
+   * Şifre ayrı bir dosyadan ham olarak okunabilir. Bu yöntem, şifrede
+   * $ " \\ # veya boşluk olduğunda ortam dosyası ayrıştırma sorunlarını
+   * önler; sunucu kurulumu (deploy/kurulum.sh) bunu kullanır.
+   */
+  {
+    const cp = require('child_process');
+    const zorSifre = 'karisik $#"\\ şifre  ';
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'melek-pf-'));
+    const passFile = path.join(dir, 'sifre');
+    fs.writeFileSync(passFile, zorSifre);               /* satır sonu yok */
+
+    const childPort = PORT + 1;
+    const runner = path.join(dir, 'run.js');
+    fs.writeFileSync(runner, `
+process.env.PORT = ${JSON.stringify(String(PORT + 1))};
+process.env.MELEK_DB = ${JSON.stringify(path.join(dir, 'db.sqlite'))};
+process.env.MELEK_ADMIN_PASSWORD_FILE = ${JSON.stringify(passFile)};
+delete process.env.MELEK_ADMIN_PASSWORD;
+const s = require(${JSON.stringify(path.join(__dirname, '..', 'server', 'server.js'))});
+require(${JSON.stringify(path.join(__dirname, '..', 'server', 'db.js'))}).open();
+s.server.listen(${childPort}, '127.0.0.1', async () => {
+  const url = 'http://127.0.0.1:${childPort}/api/admin/login';
+  const headers = { 'Content-Type': 'application/json' };
+  const dogru = await fetch(url, { method: 'POST', headers,
+    body: JSON.stringify({ passcode: ${JSON.stringify(zorSifre)} }) });
+  const yanlis = await fetch(url, { method: 'POST', headers,
+    body: JSON.stringify({ passcode: 'bambaska' }) });
+  console.log('SONUC:' + JSON.stringify({ dogru: dogru.status, yanlis: yanlis.status }));
+  await s.stop(); process.exit(0);
+});
+`);
+
+    let sonuc = null;
+    try {
+      const out = cp.execFileSync('node', ['--disable-warning=ExperimentalWarning', runner],
+        { encoding: 'utf8', timeout: 20000 });
+      const line = out.split('\n').find((l) => l.startsWith('SONUC:'));
+      sonuc = JSON.parse(line.slice(6));
+    } catch (err) {
+      sonuc = { hata: String(err.message).slice(0, 120) };
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    eq('zor karakterli şifre dosyadan okunur', sonuc.dogru, 200);
+    eq('yanlış şifre yine reddedilir', sonuc.yanlis, 401);
+  }
+
   /* ======================== STATİK VE KORUMA ========================= */
 
   section('GÜVENLİK — statik dosya koruması');

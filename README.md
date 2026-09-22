@@ -198,6 +198,7 @@ satırında verilen ortam değişkenleri `.env` değerlerini ezer.
 | Değişken | Varsayılan | Açıklama |
 | --- | --- | --- |
 | `MELEK_ADMIN_PASSWORD` | `melek2026` | Panel şifresi — **mutlaka değiştirin** |
+| `MELEK_ADMIN_PASSWORD_FILE` | — | Şifreyi bir dosyadan okur (aşağıya bakın) |
 | `PORT` | `3000` | Dinlenecek port |
 | `MELEK_DB` | `data/melek.db` | Veritabanı dosyasının yolu |
 | `MELEK_SECURE_COOKIES` | kapalı | HTTPS arkasındaysanız `1` yapın |
@@ -206,6 +207,12 @@ satırında verilen ortam değişkenleri `.env` değerlerini ezer.
 | `MELEK_LOGIN_MAX_ATTEMPTS` | `10` | Giriş denemesi sınırı |
 
 Örnek için `.env.example` dosyasına bakın.
+
+> **Şifrede `$ " \ #` veya boşluk varsa** `MELEK_ADMIN_PASSWORD` yerine
+> `MELEK_ADMIN_PASSWORD_FILE` kullanın: şifreyi ayrı bir dosyaya ham
+> olarak yazın ve bu değişkene dosyanın yolunu verin. Böylece ortam
+> dosyası ayrıştırma sorunları tamamen ortadan kalkar. Sunucu kurulum
+> betiği bu yöntemi kullanır.
 
 ### Fiyat ve hizmetler — `js/data.js`
 
@@ -297,7 +304,7 @@ Sizin yapmanız gerekenler:
 
 | Dosya | İçerik | Depoya girer mi? | Tarayıcıya iner mi? |
 | --- | --- | --- | --- |
-| `.env` | **Gerçek şifreniz** | ❌ Hayır | ❌ Hayır |
+| `.env` veya şifre dosyası | **Gerçek şifreniz** | ❌ Hayır | ❌ Hayır |
 | `js/config.js` | Yalnızca yerel mod için geçici şifre | ✅ Evet | ✅ Evet |
 
 > **Gerçek şifrenizi `js/config.js` içine yazmayın.** Bu dosya her ziyaretçinin
@@ -309,7 +316,25 @@ Sizin yapmanız gerekenler:
 
 ## Sunucuya Kurulum
 
-### Kendi sunucunuzda (VPS)
+### Ücretsiz sunucu (önerilen)
+
+Oracle Cloud veya Google Cloud'un **Always Free** sunucuları süresiz
+ücretsizdir ve 7/24 açık kalır. DuckDNS'ten ücretsiz alan adı, Caddy'den
+ücretsiz HTTPS sertifikası alınır. Aylık ödeme yoktur.
+
+Adım adım rehber: **[deploy/UCRETSIZ-SUNUCU.md](deploy/UCRETSIZ-SUNUCU.md)**
+
+Sunucuya bağlandıktan sonra kurulumun tamamı tek komuttur:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/imrankilic10-lgtm/melek-guzellik/HEAD/deploy/kurulum.sh -o kurulum.sh
+sudo bash kurulum.sh
+```
+
+Betik Node.js'i kurar, projeyi indirir, servisi tanımlar, HTTPS
+sertifikası alır, güvenlik duvarını açar ve günlük yedeklemeyi kurar.
+
+### Kendi sunucunuzda (elle kurulum)
 
 ```bash
 # 1. Dosyaları sunucuya kopyalayın (.env dahil edilmez, ayrıca kurulur)
@@ -384,10 +409,10 @@ kayıtların tamamını değiştirir; onay sorulur.
 
 ## Test
 
-Dört test paketi vardır; toplam **386 kontrol**.
+Dört test paketi vardır; toplam **388 kontrol**.
 
 ```bash
-npm test            # iş mantığı (78) + API (99)  — tarayıcı gerekmez
+npm test            # iş mantığı (78) + API (101) — tarayıcı gerekmez
 npm run test:e2e    # tarayıcı, yerel mod (170)   — Playwright gerekir
 npm run test:e2e-api # tarayıcı, API modu (39)
 npm run test:all    # hepsi
@@ -403,7 +428,7 @@ eşzamanlı istek yarışı, oturum ve yetki kontrolleri, giriş deneme sınır�
 dosya erişim koruması, yedekleme/geri yükleme, erişilebilirlik, console
 hatası kontrolü ve 375–1440px responsive kontrolü.
 
-**Son çalıştırma: 386 kontrol başarılı, 0 başarısız, console hatası yok.**
+**Son çalıştırma: 388 kontrol başarılı, 0 başarısız, console hatası yok.**
 
 ---
 

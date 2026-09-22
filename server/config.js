@@ -53,7 +53,30 @@ function intFromEnv(name, fallback) {
 }
 
 const DEV_PASSWORD = 'melek2026';
-const adminPassword = process.env.MELEK_ADMIN_PASSWORD || DEV_PASSWORD;
+
+/*
+ * Şifre iki yoldan verilebilir:
+ *   MELEK_ADMIN_PASSWORD_FILE → dosyanın içeriği ham şifredir (önerilen)
+ *   MELEK_ADMIN_PASSWORD      → doğrudan ortam değişkeni
+ *
+ * Dosya yöntemi, şifrede $ " \ # gibi karakterler olduğunda ortam
+ * dosyası ayrıştırma sorunlarını tamamen ortadan kaldırır.
+ */
+function readPasswordFile(filePath) {
+  try {
+    /* Yalnızca tek bir sondaki satır sonu atılır; şifre boşlukla bitebilir */
+    return fs.readFileSync(filePath, 'utf8').replace(/\r?\n$/, '');
+  } catch (err) {
+    console.error('Şifre dosyası okunamadı: ' + filePath);
+    console.error(err.message);
+    process.exit(1);
+  }
+}
+
+const passwordFile = process.env.MELEK_ADMIN_PASSWORD_FILE;
+const adminPassword = passwordFile
+  ? readPasswordFile(passwordFile)
+  : (process.env.MELEK_ADMIN_PASSWORD || DEV_PASSWORD);
 
 const config = {
   port: intFromEnv('PORT', 3000),
