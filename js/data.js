@@ -6,12 +6,10 @@
 (function (global) {
   'use strict';
 
-  var SALON = {
-    name: 'Melek Güzellik Salonu',
-    phoneDisplay: '0555 191 8058',
-    phoneLink: 'tel:+905551918058',
-    staffCount: 1
-  };
+  var Config = global.MelekConfig ||
+    (typeof require !== 'undefined' ? require('./config.js') : null);
+
+  var SALON = Config.salon;
 
   /*
    * selection: 'multi'  -> aynı anda birden fazla hizmet seçilebilir (lazer)
@@ -73,14 +71,9 @@
     }
   ];
 
-  var TIME_SLOTS = [
-    '10:00', '10:30', '11:00', '11:30', '12:00',
-    '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
-    '16:00', '16:30', '17:00', '17:30', '18:00'
-  ];
-
-  /* Müşteriye açık gün sayısı */
-  var BOOKABLE_DAYS = 14;
+  /* Çalışma düzeni config.js'ten okunur */
+  var TIME_SLOTS = Config.timeSlots;
+  var BOOKABLE_DAYS = Config.bookableDays;
 
   var WEEKDAYS_SHORT = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   var MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
@@ -113,6 +106,7 @@
   }
 
   var MelekData = {
+    CONFIG: Config,
     SALON: SALON,
     CATEGORIES: CATEGORIES,
     TIME_SLOTS: TIME_SLOTS,

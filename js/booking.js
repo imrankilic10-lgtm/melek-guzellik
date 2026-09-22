@@ -42,6 +42,14 @@
     return String(amount) + ' TL';
   }
 
+  /* Salon o gün kapalı mı? (haftalık izin günü veya tatil tarihi) */
+  function isDayClosed(dateISO) {
+    var config = Data.CONFIG;
+    if ((config.closedDates || []).indexOf(dateISO) !== -1) return true;
+    var weekday = parseISODate(dateISO).getDay();
+    return (config.closedWeekdays || []).indexOf(weekday) !== -1;
+  }
+
   /* Müşteriye gösterilecek gün listesi (bugünden itibaren) */
   function buildDays(today, count) {
     var base = today || new Date();
@@ -49,12 +57,14 @@
     var days = [];
     for (var i = 0; i < total; i++) {
       var date = addDays(base, i);
+      var iso = toISODate(date);
       days.push({
-        iso: toISODate(date),
+        iso: iso,
         dayNumber: date.getDate(),
         weekday: Data.WEEKDAYS_SHORT[date.getDay()],
         month: Data.MONTHS_SHORT[date.getMonth()],
-        isToday: i === 0
+        isToday: i === 0,
+        closed: isDayClosed(iso)
       });
     }
     return days;
@@ -67,7 +77,7 @@
       serviceIds: [],
       date: null,
       time: null,
-      customer: { name: '', phone: '' }
+      customer: { name: '', phone: '', note: '' }
     };
   }
 
@@ -185,15 +195,25 @@
     });
   }
 
+  /*
+   * Saat geçmiş mi? config.minimumNoticeMinutes kadar da öne tampon konur
+   * (ör. 60 -> en erken bir saat sonrasına randevu verilebilir).
+   */
   function isPastSlot(dateISO, time, now) {
     var reference = now || new Date();
     if (dateISO !== toISODate(reference)) return false;
+    var notice = Data.CONFIG.minimumNoticeMinutes || 0;
     var minutesNow = reference.getHours() * 60 + reference.getMinutes();
-    return timeToMinutes(time) <= minutesNow;
+    return timeToMinutes(time) <= minutesNow + notice;
   }
 
   /* Bir gün için saat listesini uygunluk bilgisiyle döner */
   function buildSlots(dateISO, appointments, durationMinutes, now) {
+    if (isDayClosed(dateISO)) {
+      return Data.TIME_SLOTS.map(function (time) {
+        return { time: time, available: false, reason: 'closed' };
+      });
+    }
     return Data.TIME_SLOTS.map(function (time) {
       var past = isPastSlot(dateISO, time, now);
       var busy = hasConflict(appointments, dateISO, time, durationMinutes);
@@ -216,6 +236,9 @@
 
   function validateSchedule(state) {
     if (!state.date) return { ok: false, message: 'Lütfen bir tarih seçin.' };
+    if (isDayClosed(state.date)) {
+      return { ok: false, message: 'Salonumuz bu tarihte kapalıdır. Lütfen başka bir gün seçin.' };
+    }
     if (!state.time) return { ok: false, message: 'Lütfen bir saat seçin.' };
     return { ok: true };
   }
@@ -247,6 +270,7 @@
     return {
       customerName: String(state.customer.name || '').trim(),
       phone: normalizePhone(state.customer.phone),
+      note: String(state.customer.note || '').trim(),
       date: state.date,
       time: state.time,
       serviceIds: state.serviceIds.slice(),
@@ -256,6 +280,85 @@
       total: summary.total,
       duration: summary.duration
     };
+  }
+
+  /* ---------- Takvim dosyası (.ics) ---------- */
+
+  function icsEscape(text) {
+    return String(text || '')
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\r?\n/g, '\\n');
+  }
+
+  /* Yerel saati takvim biçimine çevirir: 20261010T140000 */
+  function icsLocalStamp(dateISO, minutesFromMidnight) {
+    var date = parseISODate(dateISO);
+    date.setMinutes(date.getMinutes() + minutesFromMidnight);
+    return date.getFullYear() + pad2(date.getMonth() + 1) + pad2(date.getDate()) +
+      'T' + pad2(date.getHours()) + pad2(date.getMinutes()) + '00';
+  }
+
+  function icsUtcStamp(date) {
+    return date.getUTCFullYear() + pad2(date.getUTCMonth() + 1) + pad2(date.getUTCDate()) +
+      'T' + pad2(date.getUTCHours()) + pad2(date.getUTCMinutes()) + pad2(date.getUTCSeconds()) + 'Z';
+  }
+
+  /*
+   * Randevuyu telefonun takvimine eklemek için .ics içeriği üretir.
+   * Saat dilimi bilgisi yazılmaz; cihazın yerel saati kullanılır.
+   */
+  function buildICS(appointment) {
+    var salon = Data.SALON;
+    var start = timeToMinutes(appointment.time);
+    var duration = appointment.duration || 30;
+
+    var details = [salon.name, 'Hizmet: ' + (appointment.serviceLabel || '')];
+    if (appointment.regions && appointment.regions.length) {
+      details.push('Bölgeler: ' + appointment.regions.join(', '));
+    }
+    details.push('Toplam: ' + formatPrice(appointment.total || 0));
+    details.push('Telefon: ' + salon.phoneDisplay);
+
+    return [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Melek Guzellik Salonu//Randevu//TR',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      'UID:' + (appointment.id || 'randevu') + '@melekguzellik',
+      'DTSTAMP:' + icsUtcStamp(new Date()),
+      'DTSTART:' + icsLocalStamp(appointment.date, start),
+      'DTEND:' + icsLocalStamp(appointment.date, start + duration),
+      'SUMMARY:' + icsEscape(salon.name + ' — ' + (appointment.serviceLabel || 'Randevu')),
+      'DESCRIPTION:' + icsEscape(details.join('\n')),
+      'LOCATION:' + icsEscape(salon.name),
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+  }
+
+  /* Süreyi okunur hale getirir: 90 -> "1 sa 30 dk" */
+  function formatDuration(minutes) {
+    var total = Number(minutes) || 0;
+    if (total < 60) return total + ' dk';
+    var hours = Math.floor(total / 60);
+    var rest = total % 60;
+    return rest ? hours + ' sa ' + rest + ' dk' : hours + ' sa';
+  }
+
+  /* Randevunun bitiş saati: "14:00" + 45 -> "14:45" */
+  function endTime(time, duration) {
+    var total = timeToMinutes(time) + (Number(duration) || 0);
+    return pad2(Math.floor(total / 60) % 24) + ':' + pad2(total % 60);
+  }
+
+  /* Kısa tarih: 2026-10-10 -> "10 Eki 2026" */
+  function formatDateShort(iso) {
+    var date = parseISODate(iso);
+    return date.getDate() + ' ' + Data.MONTHS_SHORT[date.getMonth()] + ' ' + date.getFullYear();
   }
 
   var MelekBooking = {
@@ -280,7 +383,12 @@
     timeToMinutes: timeToMinutes,
     addDays: addDays,
     formatDateLong: formatDateLong,
+    formatDateShort: formatDateShort,
     formatPrice: formatPrice,
+    formatDuration: formatDuration,
+    endTime: endTime,
+    isDayClosed: isDayClosed,
+    buildICS: buildICS,
     CONFLICT_MESSAGE: 'Bu saat için başka bir randevu bulunuyor. Lütfen farklı bir saat seçin.'
   };
 

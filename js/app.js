@@ -11,23 +11,22 @@
 
   var state = Booking.createState();
   var currentStep = 1;
-  var appointments = [];   /* çakışma kontrolü için mevcut randevular */
+  var maxStepReached = 1;     /* adım göstergesinden geri dönebilmek için */
+  var appointments = [];      /* çakışma kontrolü için mevcut randevular */
   var lastAppointment = null;
+  var submitting = false;
 
   var el = {};
 
-  /* --------------------------- Yardımcılar ------------------------------ */
+  /* ----------------------------- yardımcılar ---------------------------- */
 
   function $(id) { return document.getElementById(id); }
 
-  function cacheElements() {
-    ['stepper', 'notice', 'categories', 'days', 'slots', 'time-hint', 'summary',
-     'confirm-summary', 'customer-form', 'customer-name', 'customer-phone',
-     'btn-next', 'btn-back', 'total-price', 'total-bar', 'actionbar',
-     'new-appointment'].forEach(function (id) {
-      el[id] = $(id);
-    });
-    el.steps = [1, 2, 3, 4].map(function (n) { return $('step-' + n); });
+  function createEl(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
   }
 
   function showNotice(message, kind) {
@@ -41,17 +40,6 @@
     el.notice.textContent = '';
   }
 
-  function scrollToTop() {
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  }
-
-  function createEl(tag, className, text) {
-    var node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined && text !== null) node.textContent = text;
-    return node;
-  }
-
   /* ------------------------ Adım 1: hizmetler --------------------------- */
 
   function renderCategories() {
@@ -59,6 +47,7 @@
 
     Data.CATEGORIES.forEach(function (category) {
       var section = createEl('section', 'category');
+      section.dataset.categoryId = category.id;
 
       var head = createEl('div', 'category__head');
       head.appendChild(createEl('h3', 'category__title', category.name));
@@ -74,7 +63,7 @@
         button.setAttribute('aria-pressed', 'false');
 
         var main = createEl('div', 'option__main');
-        var mark = createEl('span', 'option__mark', '✓');
+        var mark = createEl('span', 'option__mark');
         mark.setAttribute('aria-hidden', 'true');
         main.appendChild(mark);
         main.appendChild(createEl('span', 'option__name', service.name));
@@ -92,30 +81,73 @@
   }
 
   function syncServiceButtons() {
-    var buttons = el.categories.querySelectorAll('.option');
-    Array.prototype.forEach.call(buttons, function (button) {
-      var selected = Booking.isSelected(state, button.dataset.serviceId);
-      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    Array.prototype.forEach.call(el.categories.querySelectorAll('.option'), function (button) {
+      button.setAttribute('aria-pressed',
+        Booking.isSelected(state, button.dataset.serviceId) ? 'true' : 'false');
     });
+  }
+
+  /* Seçilen hizmetleri kaldırılabilir etiketler halinde gösterir */
+  function renderChips() {
+    var selected = Booking.getSelectedServices(state);
+    el.chips.hidden = selected.length === 0;
+    el.chipsList.innerHTML = '';
+
+    var fragment = document.createDocumentFragment();
+    selected.forEach(function (item) {
+      var li = createEl('li');
+      var button = createEl('button', 'chip');
+      button.type = 'button';
+      button.dataset.serviceId = item.id;
+      button.setAttribute('aria-label', item.name + ' seçimini kaldır');
+      button.appendChild(createEl('span', 'chip__name', item.name));
+      button.appendChild(createEl('span', 'chip__price', Booking.formatPrice(item.price)));
+      button.appendChild(createEl('span', 'chip__remove', '×'));
+      li.appendChild(button);
+      fragment.appendChild(li);
+    });
+    el.chipsList.appendChild(fragment);
   }
 
   function onServiceClick(event) {
     var button = event.target.closest('.option');
     if (!button) return;
+    toggleService(button.dataset.serviceId);
+  }
 
-    Booking.toggleService(state, button.dataset.serviceId);
+  function onChipClick(event) {
+    var button = event.target.closest('.chip');
+    if (!button) return;
+    toggleService(button.dataset.serviceId);
+  }
+
+  function toggleService(serviceId) {
+    Booking.toggleService(state, serviceId);
     syncServiceButtons();
+    renderChips();
     updateTotal();
     clearNotice();
 
-    /* Süre değişince seçili saat geçersiz kalabilir */
-    if (state.time && Booking.hasConflict(appointments, state.date, state.time, Booking.getDuration(state))) {
+    /* Süre değişince seçili saat geçersiz kalmış olabilir */
+    if (state.date && state.time &&
+        Booking.hasConflict(appointments, state.date, state.time, Booking.getDuration(state))) {
       state.time = null;
     }
   }
 
+  function clearAllServices() {
+    state.serviceIds = [];
+    state.time = null;
+    syncServiceButtons();
+    renderChips();
+    updateTotal();
+    clearNotice();
+  }
+
   function updateTotal() {
-    el['total-price'].textContent = Booking.formatPrice(Booking.getTotal(state));
+    var duration = Booking.getDuration(state);
+    el.totalPrice.textContent = Booking.formatPrice(Booking.getTotal(state));
+    el.totalMeta.textContent = duration ? 'yakl. ' + Booking.formatDuration(duration) : '';
   }
 
   /* ------------------------ Adım 2: tarih & saat ------------------------ */
@@ -128,12 +160,14 @@
       var button = createEl('button', 'day');
       button.type = 'button';
       button.dataset.date = day.iso;
+      button.disabled = day.closed;
       button.setAttribute('aria-pressed', state.date === day.iso ? 'true' : 'false');
-      button.setAttribute('aria-label', Booking.formatDateLong(day.iso));
+      button.setAttribute('aria-label',
+        Booking.formatDateLong(day.iso) + (day.closed ? ' — kapalı' : ''));
 
       button.appendChild(createEl('span', 'day__weekday', day.isToday ? 'Bugün' : day.weekday));
       button.appendChild(createEl('span', 'day__num', String(day.dayNumber)));
-      button.appendChild(createEl('span', 'day__month', day.month));
+      button.appendChild(createEl('span', 'day__month', day.closed ? 'Kapalı' : day.month));
       fragment.appendChild(button);
     });
 
@@ -145,8 +179,9 @@
     el.slots.innerHTML = '';
 
     if (!state.date) {
-      el['time-hint'].hidden = false;
-      el['time-hint'].textContent = 'Saatleri görmek için önce bir tarih seçin.';
+      el.timeHint.hidden = false;
+      el.timeHint.textContent = 'Saatleri görmek için önce bir tarih seçin.';
+      el.legend.hidden = true;
       return;
     }
 
@@ -154,10 +189,13 @@
     var slots = Booking.buildSlots(state.date, appointments, duration, new Date());
     var openCount = slots.filter(function (slot) { return slot.available; }).length;
 
-    el['time-hint'].hidden = openCount > 0;
+    el.timeHint.hidden = openCount > 0;
     if (!openCount) {
-      el['time-hint'].textContent = 'Bu gün için uygun saat kalmadı. Lütfen başka bir gün seçin.';
+      el.timeHint.textContent = Booking.isDayClosed(state.date)
+        ? 'Salonumuz bu tarihte kapalıdır. Lütfen başka bir gün seçin.'
+        : 'Bu gün için uygun saat kalmadı. Lütfen başka bir gün seçin.';
     }
+    el.legend.hidden = openCount === slots.length || openCount === 0;
 
     var fragment = document.createDocumentFragment();
     slots.forEach(function (slot) {
@@ -172,6 +210,9 @@
       } else if (slot.reason === 'past') {
         button.title = 'Bu saat geçti';
         button.setAttribute('aria-label', slot.time + ' — geçti');
+      } else if (slot.reason === 'closed') {
+        button.title = 'Salon kapalı';
+        button.setAttribute('aria-label', slot.time + ' — kapalı');
       }
       fragment.appendChild(button);
     });
@@ -180,7 +221,7 @@
 
   function onDayClick(event) {
     var button = event.target.closest('.day');
-    if (!button) return;
+    if (!button || button.disabled) return;
 
     state.date = button.dataset.date;
     state.time = null;
@@ -222,7 +263,13 @@
       target.appendChild(summaryRow('Bölgeler', source.regions.join(', ')));
     }
     if (source.date) target.appendChild(summaryRow('Tarih', Booking.formatDateLong(source.date)));
-    if (source.time) target.appendChild(summaryRow('Saat', source.time));
+    if (source.time) {
+      target.appendChild(summaryRow('Saat',
+        source.time + ' – ' + Booking.endTime(source.time, source.duration || 30)));
+    }
+    if (source.duration) {
+      target.appendChild(summaryRow('Tahmini süre', Booking.formatDuration(source.duration)));
+    }
     target.appendChild(summaryRow('Toplam', Booking.formatPrice(source.total), 'total'));
   }
 
@@ -233,14 +280,17 @@
       regions: summary.regions,
       date: state.date,
       time: state.time,
+      duration: summary.duration,
       total: summary.total
     });
   }
 
   /* --------------------------- Adım yönetimi ---------------------------- */
 
-  function setStep(step) {
+  function setStep(step, options) {
+    var silent = options && options.silent;
     currentStep = step;
+    if (step > maxStepReached) maxStepReached = step;
 
     el.steps.forEach(function (section, index) {
       section.hidden = (index + 1) !== step;
@@ -250,27 +300,30 @@
       var n = Number(item.dataset.step);
       item.classList.toggle('is-active', n === step);
       item.classList.toggle('is-done', n < step);
+      /* Onay adımına geçildiyse geri dönüş kapanır */
+      var button = item.querySelector('.stepper__btn');
+      button.disabled = !(n < step && step < 4);
     });
 
-    /* Aksiyon çubuğu: 3. adımda form butonu, 4. adımda hiç gerekmez */
     el.actionbar.hidden = (step === 3 || step === 4);
-    el['btn-back'].hidden = (step === 1);
-    el['total-bar'].hidden = false;
+    el.btnBack.hidden = (step === 1);
 
-    if (step === 1) el['btn-next'].textContent = 'Tarih ve Saat Seç';
-    if (step === 2) el['btn-next'].textContent = 'Bilgilerime Geç';
+    if (step === 1) el.btnNext.textContent = 'Tarih ve Saat Seç';
+    if (step === 2) el.btnNext.textContent = 'Bilgilerime Geç';
 
-    scrollToTop();
+    if (!silent) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      /* Ekran okuyucu ve klavye odağını yeni adıma taşı */
+      el.steps[step - 1].focus({ preventScroll: true });
+    }
   }
 
   function goToDateStep() {
     var check = Booking.validateServices(state);
-    if (!check.ok) {
-      showNotice(check.message);
-      return;
-    }
+    if (!check.ok) { showNotice(check.message); return; }
+
     clearNotice();
-    refreshAppointments().then(function () {
+    return refreshAppointments().then(function () {
       renderDays();
       renderSlots();
       setStep(2);
@@ -279,10 +332,7 @@
 
   function goToCustomerStep() {
     var check = Booking.validateSchedule(state);
-    if (!check.ok) {
-      showNotice(check.message);
-      return;
-    }
+    if (!check.ok) { showNotice(check.message); return; }
 
     return refreshAppointments().then(function () {
       if (Booking.hasConflict(appointments, state.date, state.time, Booking.getDuration(state))) {
@@ -308,16 +358,30 @@
     else if (currentStep === 3) setStep(2);
   }
 
+  function onStepperClick(event) {
+    var button = event.target.closest('.stepper__btn');
+    if (!button || button.disabled) return;
+
+    var target = Number(button.dataset.goto);
+    if (target >= currentStep || currentStep === 4) return;
+
+    clearNotice();
+    if (target === 2) { renderDays(); renderSlots(); }
+    setStep(target);
+  }
+
   /* ------------------------ Adım 3: kayıt ------------------------------- */
 
   function onSubmit(event) {
-    event.preventDefault();   /* sayfanın yenilenmesini engelle */
+    event.preventDefault();          /* sayfanın yenilenmesini engelle */
+    if (submitting) return;
 
-    state.customer.name = el['customer-name'].value;
-    state.customer.phone = el['customer-phone'].value;
+    state.customer.name = el.customerName.value;
+    state.customer.phone = el.customerPhone.value;
+    state.customer.note = el.customerNote.value;
 
-    el['customer-name'].setAttribute('aria-invalid', 'false');
-    el['customer-phone'].setAttribute('aria-invalid', 'false');
+    el.customerName.setAttribute('aria-invalid', 'false');
+    el.customerPhone.setAttribute('aria-invalid', 'false');
 
     var serviceCheck = Booking.validateServices(state);
     if (!serviceCheck.ok) { showNotice(serviceCheck.message); setStep(1); return; }
@@ -328,13 +392,15 @@
     var customerCheck = Booking.validateCustomer(state.customer);
     if (!customerCheck.ok) {
       showNotice(customerCheck.message);
-      var field = el['customer-' + customerCheck.field];
-      if (field) { field.setAttribute('aria-invalid', 'true'); field.focus(); }
+      var field = customerCheck.field === 'name' ? el.customerName : el.customerPhone;
+      field.setAttribute('aria-invalid', 'true');
+      field.focus();
       return;
     }
 
-    var button = $('submit-appointment');
-    button.disabled = true;
+    submitting = true;
+    el.submitButton.disabled = true;
+    el.submitButton.textContent = 'Kaydediliyor…';
 
     refreshAppointments()
       .then(function () {
@@ -351,11 +417,12 @@
         if (!saved) return;
         lastAppointment = saved;
         clearNotice();
-        renderSummaryInto(el['confirm-summary'], {
+        renderSummaryInto(el.confirmSummary, {
           serviceLabel: saved.serviceLabel,
           regions: saved.regions,
           date: saved.date,
           time: saved.time,
+          duration: saved.duration,
           total: saved.total
         });
         setStep(4);
@@ -365,15 +432,41 @@
         showNotice(err && err.message ? err.message : 'Randevu kaydedilemedi. Lütfen tekrar deneyin.');
       })
       .then(function () {
-        button.disabled = false;
+        submitting = false;
+        el.submitButton.disabled = false;
+        el.submitButton.textContent = 'Randevuyu Oluştur';
       });
+  }
+
+  /* Randevuyu telefonun takvimine ekler (.ics indirir) */
+  function onAddToCalendar() {
+    if (!lastAppointment) return;
+    try {
+      var blob = new Blob([Booking.buildICS(lastAppointment)],
+        { type: 'text/calendar;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement('a');
+      link.href = url;
+      link.download = 'melek-randevu-' + lastAppointment.date + '.ics';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    } catch (err) {
+      console.error(err);
+      showNotice('Takvim dosyası oluşturulamadı.');
+    }
   }
 
   function startOver() {
     state = Booking.createState();
     lastAppointment = null;
-    el['customer-form'].reset();
+    maxStepReached = 1;
+    el.customerForm.reset();
+    el.customerName.setAttribute('aria-invalid', 'false');
+    el.customerPhone.setAttribute('aria-invalid', 'false');
     syncServiceButtons();
+    renderChips();
     updateTotal();
     clearNotice();
     setStep(1);
@@ -393,20 +486,71 @@
 
   /* ------------------------------ Başlat -------------------------------- */
 
+  function cacheElements() {
+    el.stepper = $('stepper');
+    el.notice = $('notice');
+    el.categories = $('categories');
+    el.chips = $('chips');
+    el.chipsList = $('chips-list');
+    el.days = $('days');
+    el.slots = $('slots');
+    el.timeHint = $('time-hint');
+    el.legend = $('slots-legend');
+    el.summary = $('summary');
+    el.confirmSummary = $('confirm-summary');
+    el.customerForm = $('customer-form');
+    el.customerName = $('customer-name');
+    el.customerPhone = $('customer-phone');
+    el.customerNote = $('customer-note');
+    el.submitButton = $('submit-appointment');
+    el.btnNext = $('btn-next');
+    el.btnBack = $('btn-back');
+    el.totalPrice = $('total-price');
+    el.totalMeta = $('total-meta');
+    el.actionbar = $('actionbar');
+    el.steps = [1, 2, 3, 4].map(function (n) { return $('step-' + n); });
+  }
+
+
+  /* Telefon bağlantılarını config.js'teki numaraya göre günceller */
+  function applySalonInfo() {
+    var salon = (window.MelekConfig || {}).salon;
+    if (!salon) return;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-phone]'), function (link) {
+      link.href = salon.phoneLink;
+      link.setAttribute('aria-label', 'Telefonla ara: ' + salon.phoneDisplay);
+      var text = link.querySelector('[data-phone-text]');
+      if (text) text.textContent = salon.phoneDisplay;
+    });
+  }
+
+  function renderFooterHours() {
+    var slots = Data.TIME_SLOTS;
+    var closing = Booking.endTime(slots[slots.length - 1], 30);
+    $('footer-hours').textContent = 'Her gün ' + slots[0] + ' – ' + closing;
+  }
+
   function init() {
     cacheElements();
     renderCategories();
+    renderChips();
     renderDays();
     updateTotal();
-    setStep(1);
+    renderFooterHours();
+    applySalonInfo();
+    setStep(1, { silent: true });
 
     el.categories.addEventListener('click', onServiceClick);
+    el.chipsList.addEventListener('click', onChipClick);
+    $('clear-all').addEventListener('click', clearAllServices);
     el.days.addEventListener('click', onDayClick);
     el.slots.addEventListener('click', onSlotClick);
-    el['btn-next'].addEventListener('click', onNextClick);
-    el['btn-back'].addEventListener('click', onBackClick);
-    el['customer-form'].addEventListener('submit', onSubmit);
-    el['new-appointment'].addEventListener('click', startOver);
+    el.stepper.addEventListener('click', onStepperClick);
+    el.btnNext.addEventListener('click', onNextClick);
+    el.btnBack.addEventListener('click', onBackClick);
+    el.customerForm.addEventListener('submit', onSubmit);
+    $('add-to-calendar').addEventListener('click', onAddToCalendar);
+    $('new-appointment').addEventListener('click', startOver);
 
     /* Başka sekmede (ör. yönetici panelinde) yapılan değişiklikleri yakala */
     window.addEventListener('storage', function (event) {

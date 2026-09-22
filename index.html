@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Melek Güzellik Salonu — Online Randevu</title>
-  <meta name="description" content="Melek Güzellik Salonu online randevu sistemi. Lazer epilasyon, cilt bakımı, manikür, pedikür, kaş ve kirpik hizmetleri.">
+  <meta name="description" content="Melek Güzellik Salonu online randevu sistemi. Lazer epilasyon, cilt bakımı, manikür, pedikür, kaş ve kirpik hizmetleri için hızlıca randevu alın.">
+  <meta name="theme-color" content="#5c4634">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -16,40 +17,73 @@
         <span class="brand__name">Melek</span>
         <span class="brand__sub">Güzellik Salonu</span>
       </div>
-      <a class="phone" href="tel:+905551918058" aria-label="Telefonla ara: 0555 191 8058">
+      <a class="phone" data-phone href="tel:+905551918058">
         <svg class="phone__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.4 11.4 0 0 0 .58 3.6 1 1 0 0 1-.25 1z"/>
         </svg>
-        <span>0555 191 8058</span>
+        <span data-phone-text>0555 191 8058</span>
       </a>
     </div>
   </header>
 
   <main id="main" class="wrap">
     <section class="intro">
-      <h1 class="intro__title">Online Randevu</h1>
-      <p class="intro__text">Hizmetinizi seçin, size uygun gün ve saati belirleyin. Randevunuz anında oluşturulur.</p>
+      <p class="intro__eyebrow">Online Randevu</p>
+      <h1 class="intro__title">Size uygun günü seçin</h1>
+      <p class="intro__text">
+        Hizmetinizi seçin, gün ve saati belirleyin. Randevunuz anında oluşturulur.
+      </p>
     </section>
 
-    <!-- Adım göstergesi -->
-    <ol class="stepper" id="stepper" aria-label="Randevu adımları">
-      <li class="stepper__item is-active" data-step="1"><span class="stepper__num">1</span><span class="stepper__label">Hizmet</span></li>
-      <li class="stepper__item" data-step="2"><span class="stepper__num">2</span><span class="stepper__label">Tarih &amp; Saat</span></li>
-      <li class="stepper__item" data-step="3"><span class="stepper__num">3</span><span class="stepper__label">Bilgiler</span></li>
-      <li class="stepper__item" data-step="4"><span class="stepper__num">4</span><span class="stepper__label">Onay</span></li>
-    </ol>
+    <!-- Adım göstergesi — tamamlanan adımlara tıklanarak dönülebilir -->
+    <nav class="stepper" id="stepper" aria-label="Randevu adımları">
+      <ol class="stepper__list">
+        <li class="stepper__item is-active" data-step="1">
+          <button type="button" class="stepper__btn" data-goto="1" disabled>
+            <span class="stepper__num">1</span>
+            <span class="stepper__label">Hizmet</span>
+          </button>
+        </li>
+        <li class="stepper__item" data-step="2">
+          <button type="button" class="stepper__btn" data-goto="2" disabled>
+            <span class="stepper__num">2</span>
+            <span class="stepper__label">Tarih &amp; Saat</span>
+          </button>
+        </li>
+        <li class="stepper__item" data-step="3">
+          <button type="button" class="stepper__btn" data-goto="3" disabled>
+            <span class="stepper__num">3</span>
+            <span class="stepper__label">Bilgiler</span>
+          </button>
+        </li>
+        <li class="stepper__item" data-step="4">
+          <button type="button" class="stepper__btn" data-goto="4" disabled>
+            <span class="stepper__num">4</span>
+            <span class="stepper__label">Onay</span>
+          </button>
+        </li>
+      </ol>
+    </nav>
 
-    <!-- Bildirim alanı -->
     <p class="notice" id="notice" role="alert" hidden></p>
 
     <!-- ADIM 1 — HİZMET SEÇİMİ -->
-    <section class="step" id="step-1" aria-labelledby="step-1-title">
+    <section class="step" id="step-1" aria-labelledby="step-1-title" tabindex="-1">
       <h2 class="step__title" id="step-1-title">Hizmet Seçimi</h2>
       <div id="categories"></div>
+
+      <!-- Seçilen hizmetlerin özeti -->
+      <div class="chips" id="chips" hidden>
+        <div class="chips__head">
+          <h3 class="chips__title">Seçtikleriniz</h3>
+          <button type="button" class="link-button" id="clear-all">Tümünü temizle</button>
+        </div>
+        <ul class="chips__list" id="chips-list"></ul>
+      </div>
     </section>
 
     <!-- ADIM 2 — TARİH VE SAAT -->
-    <section class="step" id="step-2" aria-labelledby="step-2-title" hidden>
+    <section class="step" id="step-2" aria-labelledby="step-2-title" tabindex="-1" hidden>
       <h2 class="step__title" id="step-2-title">Tarih ve Saat</h2>
 
       <h3 class="block__title" id="date-title">Tarih seçin</h3>
@@ -58,10 +92,13 @@
       <h3 class="block__title" id="time-title">Saat seçin</h3>
       <p class="hint" id="time-hint">Saatleri görmek için önce bir tarih seçin.</p>
       <div class="slots" id="slots" role="group" aria-labelledby="time-title"></div>
+      <p class="legend" id="slots-legend" hidden>
+        <span class="legend__item"><span class="legend__box legend__box--busy"></span>Dolu saatler seçilemez</span>
+      </p>
     </section>
 
     <!-- ADIM 3 — MÜŞTERİ BİLGİLERİ -->
-    <section class="step" id="step-3" aria-labelledby="step-3-title" hidden>
+    <section class="step" id="step-3" aria-labelledby="step-3-title" tabindex="-1" hidden>
       <h2 class="step__title" id="step-3-title">Bilgileriniz</h2>
 
       <form class="form" id="customer-form" novalidate>
@@ -74,6 +111,12 @@
           <label for="customer-phone">Telefon</label>
           <input type="tel" id="customer-phone" name="phone" inputmode="tel"
                  autocomplete="tel" placeholder="0555 000 0000" required>
+          <p class="field__help">Randevu onayı için sizi arayabilmemiz adına gereklidir.</p>
+        </div>
+        <div class="field">
+          <label for="customer-note">Not <span class="field__optional">(isteğe bağlı)</span></label>
+          <input type="text" id="customer-note" name="note" autocomplete="off"
+                 placeholder="Eklemek istedikleriniz">
         </div>
 
         <h3 class="block__title">Randevu Özeti</h3>
@@ -86,18 +129,25 @@
     </section>
 
     <!-- ADIM 4 — ONAY -->
-    <section class="step" id="step-4" aria-labelledby="step-4-title" hidden>
+    <section class="step" id="step-4" aria-labelledby="step-4-title" tabindex="-1" hidden>
       <div class="confirm">
+        <span class="confirm__mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>
+        </span>
         <h2 class="step__title" id="step-4-title">Randevunuz oluşturuldu.</h2>
         <p class="confirm__brand">Melek Güzellik Salonu</p>
+
         <dl class="summary" id="confirm-summary"></dl>
+
+        <div class="confirm__actions">
+          <button type="button" class="btn btn--ghost" id="add-to-calendar">Takvime Ekle</button>
+          <button type="button" class="btn btn--ghost" id="new-appointment">Yeni Randevu</button>
+        </div>
+
         <p class="confirm__note">
-          Değişiklik için bizi arayabilirsiniz:
-          <a href="tel:+905551918058">0555 191 8058</a>
+          Değişiklik ya da iptal için bizi arayabilirsiniz:
+          <a data-phone href="tel:+905551918058"><span data-phone-text>0555 191 8058</span></a>
         </p>
-        <button type="button" class="btn btn--ghost btn--block" id="new-appointment">
-          Yeni Randevu Oluştur
-        </button>
       </div>
     </section>
 
@@ -106,6 +156,7 @@
       <div class="actionbar__total" id="total-bar">
         <span class="actionbar__label">Toplam</span>
         <strong class="actionbar__price" id="total-price">0 TL</strong>
+        <span class="actionbar__meta" id="total-meta"></span>
       </div>
       <div class="actionbar__buttons">
         <button type="button" class="btn btn--ghost" id="btn-back" hidden>Geri</button>
@@ -115,13 +166,19 @@
   </main>
 
   <footer class="site-footer">
-    <div class="wrap">
-      <p>Melek Güzellik Salonu</p>
-      <p><a href="tel:+905551918058">0555 191 8058</a></p>
-      <p><a href="admin/">Yönetici Paneli</a></p>
+    <div class="wrap site-footer__inner">
+      <div>
+        <p class="site-footer__brand">Melek Güzellik Salonu</p>
+        <p id="footer-hours"></p>
+      </div>
+      <div>
+        <p><a data-phone href="tel:+905551918058"><span data-phone-text>0555 191 8058</span></a></p>
+        <p><a href="admin/">Yönetici Paneli</a></p>
+      </div>
     </div>
   </footer>
 
+  <script src="js/config.js"></script>
   <script src="js/data.js"></script>
   <script src="js/store.js"></script>
   <script src="js/booking.js"></script>

@@ -4,67 +4,175 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Yönetici Paneli — Melek Güzellik Salonu</title>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex, nofollow">
   <link rel="stylesheet" href="../css/style.css">
 </head>
-<body>
-  <header class="site-header">
-    <div class="wrap site-header__inner">
-      <div class="brand">
+<body class="admin-body">
+
+  <!-- ================= GİRİŞ EKRANI ================= -->
+  <section class="gate" id="gate" hidden>
+    <form class="gate__card" id="gate-form" novalidate>
+      <div class="brand brand--center">
         <span class="brand__name">Melek</span>
         <span class="brand__sub">Yönetici Paneli</span>
       </div>
-      <a class="phone" href="../index.html">Randevu Sayfası</a>
-    </div>
-  </header>
-
-  <main class="wrap">
-    <section class="intro">
-      <h1 class="intro__title">Randevular</h1>
-      <p class="intro__text">Randevular tarih ve saate göre sıralanır.</p>
-    </section>
-
-    <section class="stats" aria-label="Özet">
-      <div class="stat">
-        <span class="stat__label">Bugün</span>
-        <span class="stat__value" id="stat-today">0</span>
+      <div class="field">
+        <label for="gate-passcode">Şifre</label>
+        <input type="password" id="gate-passcode" name="passcode"
+               autocomplete="current-password" placeholder="••••••••">
       </div>
-      <div class="stat">
-        <span class="stat__label">Yaklaşan</span>
-        <span class="stat__value" id="stat-upcoming">0</span>
+      <p class="gate__error" id="gate-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn--primary btn--block">Giriş Yap</button>
+      <p class="gate__back"><a href="../index.html">← Randevu sayfasına dön</a></p>
+    </form>
+  </section>
+
+  <!-- ================= PANEL ================= -->
+  <div id="panel" hidden>
+    <header class="site-header no-print">
+      <div class="wrap site-header__inner">
+        <div class="brand">
+          <span class="brand__name">Melek</span>
+          <span class="brand__sub">Yönetici Paneli</span>
+        </div>
+        <div class="header-actions">
+          <a class="btn btn--ghost btn--small" href="../index.html">Randevu Sayfası</a>
+          <button type="button" class="btn btn--ghost btn--small" id="logout">Çıkış</button>
+        </div>
       </div>
-      <div class="stat">
-        <span class="stat__label">Toplam Kayıt</span>
-        <span class="stat__value" id="stat-all">0</span>
+    </header>
+
+    <main class="wrap">
+      <section class="intro">
+        <h1 class="intro__title">Randevular</h1>
+        <p class="intro__text" id="today-label"></p>
+      </section>
+
+      <section class="stats" aria-label="Özet">
+        <div class="stat">
+          <span class="stat__label">Bugün</span>
+          <span class="stat__value" id="stat-today">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Yaklaşan</span>
+          <span class="stat__value" id="stat-upcoming">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Toplam Kayıt</span>
+          <span class="stat__value" id="stat-all">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Bugünkü Ciro</span>
+          <span class="stat__value" id="stat-revenue">0 TL</span>
+        </div>
+      </section>
+
+      <!-- ---------- Elle randevu ekleme ---------- -->
+      <section class="panel-block no-print">
+        <div class="panel-block__head">
+          <h2 class="block__title block__title--flush">Telefonla Gelen Randevu</h2>
+          <button type="button" class="btn btn--primary btn--small" id="toggle-create"
+                  aria-expanded="false" aria-controls="create-form">
+            Yeni Randevu Ekle
+          </button>
+        </div>
+
+        <form class="create-form" id="create-form" novalidate hidden>
+          <fieldset class="create-form__services">
+            <legend>Hizmetler</legend>
+            <div id="create-services"></div>
+            <p class="create-form__total">
+              Toplam: <strong id="create-total">0 TL</strong>
+              <span class="create-form__duration" id="create-duration"></span>
+            </p>
+          </fieldset>
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="create-date">Tarih</label>
+              <input type="date" id="create-date" name="date" required>
+            </div>
+            <div class="field">
+              <label for="create-time">Saat</label>
+              <select id="create-time" name="time" required>
+                <option value="">Önce tarih seçin</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="create-name">Ad Soyad</label>
+              <input type="text" id="create-name" name="name" autocomplete="off" required>
+            </div>
+            <div class="field">
+              <label for="create-phone">Telefon</label>
+              <input type="tel" id="create-phone" name="phone" inputmode="tel" required>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="create-note">Not <span class="field__optional">(isteğe bağlı)</span></label>
+            <input type="text" id="create-note" name="note" autocomplete="off">
+          </div>
+
+          <p class="notice" id="create-error" role="alert" hidden></p>
+
+          <div class="create-form__actions">
+            <button type="submit" class="btn btn--primary" id="create-submit">Randevuyu Kaydet</button>
+            <button type="button" class="btn btn--ghost" id="create-cancel">Vazgeç</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ---------- Filtreler ---------- -->
+      <div class="toolbar no-print">
+        <div class="admin-filters" id="filters" role="group" aria-label="Randevu filtresi">
+          <button type="button" class="filter" data-filter="today" aria-pressed="true">Bugün</button>
+          <button type="button" class="filter" data-filter="tomorrow" aria-pressed="false">Yarın</button>
+          <button type="button" class="filter" data-filter="week" aria-pressed="false">Bu Hafta</button>
+          <button type="button" class="filter" data-filter="upcoming" aria-pressed="false">Yaklaşan</button>
+          <button type="button" class="filter" data-filter="past" aria-pressed="false">Geçmiş</button>
+          <button type="button" class="filter" data-filter="all" aria-pressed="false">Tümü</button>
+        </div>
+        <div class="search">
+          <label class="sr-only" for="search">Randevu ara</label>
+          <input type="search" id="search" placeholder="İsim, telefon veya hizmet ara">
+        </div>
       </div>
-      <div class="stat">
-        <span class="stat__label">Bugünkü Ciro</span>
-        <span class="stat__value" id="stat-revenue">0 TL</span>
+
+      <p class="notice" id="admin-notice" role="status" hidden></p>
+
+      <section aria-live="polite">
+        <div class="list-head">
+          <h2 class="step__title" id="list-title">Bugünkü Randevular</h2>
+          <button type="button" class="btn btn--ghost btn--small no-print" id="print">Yazdır</button>
+        </div>
+        <div id="appointment-list"></div>
+      </section>
+
+      <!-- ---------- Yedekleme ---------- -->
+      <details class="backup no-print" id="backup">
+        <summary>Yedekleme ve Dışa Aktarma</summary>
+        <p class="backup__text">
+          Randevular bu tarayıcıda saklanır. Tarayıcı verileri temizlenirse kayıtlar
+          silinir. Düzenli olarak yedek almanız önerilir.
+        </p>
+        <div class="backup__actions">
+          <button type="button" class="btn btn--ghost btn--small" id="export-json">Yedek İndir (JSON)</button>
+          <button type="button" class="btn btn--ghost btn--small" id="export-csv">Excel'e Aktar (CSV)</button>
+          <label class="btn btn--ghost btn--small" for="import-file">Yedekten Geri Yükle</label>
+          <input type="file" id="import-file" accept=".json,application/json" hidden>
+        </div>
+      </details>
+    </main>
+
+    <footer class="site-footer no-print">
+      <div class="wrap">
+        <p>Melek Güzellik Salonu — Yönetici Paneli</p>
+        <p><a data-phone href="tel:+905551918058"><span data-phone-text>0555 191 8058</span></a></p>
       </div>
-    </section>
+    </footer>
+  </div>
 
-    <div class="admin-filters" id="filters" role="group" aria-label="Randevu filtresi">
-      <button type="button" class="filter" data-filter="today" aria-pressed="true">Bugün</button>
-      <button type="button" class="filter" data-filter="tomorrow" aria-pressed="false">Yarın</button>
-      <button type="button" class="filter" data-filter="upcoming" aria-pressed="false">Yaklaşan</button>
-      <button type="button" class="filter" data-filter="all" aria-pressed="false">Tüm Randevular</button>
-    </div>
-
-    <p class="notice" id="admin-notice" role="status" hidden></p>
-
-    <section aria-live="polite">
-      <h2 class="step__title" id="list-title">Bugünkü Randevular</h2>
-      <div id="appointment-list"></div>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="wrap">
-      <p>Melek Güzellik Salonu — Yönetici Paneli</p>
-      <p><a href="tel:+905551918058">0555 191 8058</a></p>
-    </div>
-  </footer>
-
+  <script src="../js/config.js"></script>
   <script src="../js/data.js"></script>
   <script src="../js/store.js"></script>
   <script src="../js/booking.js"></script>

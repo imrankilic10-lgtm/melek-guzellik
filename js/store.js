@@ -108,6 +108,44 @@
       });
     },
 
+    /* Var olan bir randevunun alanlarını günceller */
+    update: function (id, patch) {
+      return new Promise(function (resolve, reject) {
+        try {
+          var rows = adapter.readAll();
+          var updated = null;
+          var next = rows.map(function (row) {
+            if (row.id !== id) return row;
+            updated = Object.assign({}, row, patch, { id: row.id });
+            return updated;
+          });
+          if (!updated) { resolve(null); return; }
+          adapter.writeAll(next);
+          resolve(updated);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    },
+
+    /* Yedekten geri yükleme: mevcut kayıtların tamamını değiştirir */
+    replaceAll: function (rows) {
+      return new Promise(function (resolve, reject) {
+        try {
+          if (!Array.isArray(rows)) throw new Error('Yedek dosyası okunamadı.');
+          var clean = rows.filter(function (row) {
+            return row && row.date && row.time;
+          }).map(function (row) {
+            return Object.assign({}, row, { id: row.id || makeId() });
+          });
+          adapter.writeAll(clean);
+          resolve(clean.length);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    },
+
     remove: function (id) {
       return new Promise(function (resolve, reject) {
         try {
